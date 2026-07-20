@@ -1,0 +1,71 @@
+<template>
+  <UDashboardGroup>
+    <UDashboardSidebar class="bg-black text-white border-r border-neutral-800">
+      <!-- Logo -->
+      <UDashboardSidebarHeader>
+        <div>Logo</div>
+      </UDashboardSidebarHeader>
+
+      <!-- Navigation -->
+      <UDashboardSidebarContent class="px-3 py-4">
+        <UNavigationMenu
+          orientation="vertical"
+          :items="links"
+          :ui="{
+            link: 'rounded-lg px-3 py-2 transition-colors',
+            linkActive: 'bg-yellow-400 text-black font-semibold',
+            linkInactive: 'text-gray-300 hover:bg-yellow-400 hover:text-black',
+          }"
+        />
+      </UDashboardSidebarContent>
+
+      <!-- Footer -->
+      <UDashboardSidebarFooter
+        class="border-t border-neutral-800 p-4 absolute bottom-0"
+      >
+        <div class="flex items-center gap-3">
+          <UAvatar src="https://i.pravatar.cc/100" alt="User" size="lg" />
+
+          <div class="flex flex-col">
+            <span class="font-semibold text-white"> John Doe </span>
+            <span class="text-sm text-gray-400"> Administrator </span>
+          </div>
+        </div>
+      </UDashboardSidebarFooter>
+    </UDashboardSidebar>
+
+    <div class="flex min-h-screen flex-1 flex-col bg-gray-50 w-[100%]">
+      <UDashboardNavbar class="w-[100%]" :ui="{ root: 'border-b-0' }">
+        <template #right>
+          <UButton label="Logout" />
+        </template>
+      </UDashboardNavbar>
+
+      <UDashboardPanel>
+        <UDashboardPanelContent>
+          <slot />
+        </UDashboardPanelContent>
+      </UDashboardPanel>
+    </div>
+  </UDashboardGroup>
+</template>
+
+<script setup lang="ts">
+const links = [
+  {
+    label: "Dashboard",
+    icon: "i-lucide-layout-dashboard",
+    to: "/",
+  },
+  {
+    label: "Clients",
+    icon: "i-lucide-users",
+    to: "/clients",
+  },
+  {
+    label: "Proposals",
+    icon: "i-lucide-file-text",
+    to: "/proposals",
+  },
+];
+</script>
