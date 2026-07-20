@@ -1,6 +1,7 @@
 from flask import Flask
 from sqlalchemy import text
 from .routes.auth import auth_bp
+from .routes.clients import clients_bp
 
 from .config import Config
 from .extensions import db, migrate, jwt, cors
@@ -28,5 +29,6 @@ def create_app():
 
 
     app.register_blueprint(auth_bp, url_prefix="/api")
+    app.register_blueprint(clients_bp, url_prefix="/api")
 
     return app
