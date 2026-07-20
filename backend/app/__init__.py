@@ -5,18 +5,14 @@ from app.extensions import db
 import app.models 
 from app.routes.test import test_bp
 
+from .extensions import db, migrate, jwt, cors
 
 def create_app():
     app = Flask(__name__)
 
-    app.config.from_object(Config)
-
-    db.init_app(app)
-
-    app.register_blueprint(test_bp, url_prefix="/api")
-
-    with app.app_context():
-        db.create_all()
+    @app.route("/")
+    def index():
+        return {"message": "Genesis AI Backend is running"}
 
     return app
 
