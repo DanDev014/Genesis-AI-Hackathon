@@ -30,6 +30,24 @@ class Summary(db.Model):
         nullable=True,
     )
 
+    # ======================================
+    # Relationships
+    # ======================================
+
+    # user = db.relationship(
+    #     "User",
+    #     back_populates="summaries",
+    # )
+
+    # client = db.relationship(
+    #     "Client",
+    #     back_populates="summaries",
+    # )
+
+    # ======================================
+    # Serialization
+    # ======================================
+
     def to_dict(self):
         return {
             "summary_id": self.summary_id,
@@ -47,3 +65,9 @@ class Summary(db.Model):
                 else None
             ),
         }
+
+    def __repr__(self):
+        return (
+            f"<Summary {self.summary_id} "
+            f"Client={self.client_id}>"
+        )
