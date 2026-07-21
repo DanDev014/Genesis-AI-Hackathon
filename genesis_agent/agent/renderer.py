@@ -9,6 +9,7 @@ Document renderer.
 Public API:
     render_proposal_html(data) -> str
     render_quote_html(data)    -> str
+    render_brief_html(data)    -> str
     render_pdf(html) -> bytes | None    (None if WeasyPrint isn't available)
 """
 from __future__ import annotations
@@ -78,8 +79,60 @@ def _defaults_for_quote(q: dict) -> dict:
     return q
 
 
+def _escape(s: str) -> str:
+    return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+
+def _inline_md(s: str) -> str:
+    import re
+    s = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", _escape(s))
+    return re.sub(r"_(.+?)_", r"<em>\1</em>", s)
+
+
+def _markdown_to_html(md: str) -> str:
+    """Minimal converter for the '## heading' / '- bullet' / plain-paragraph
+    format brief.py's own system prompts are instructed to produce. Not a
+    general markdown parser — deliberately narrow to what we generate
+    ourselves, so no new dependency is needed just to print a brief."""
+    lines, in_list = [], False
+    for raw in (md or "").splitlines():
+        line = raw.rstrip()
+        if line.startswith("## "):
+            if in_list:
+                lines.append("</ul>"); in_list = False
+            lines.append(f"<h2>{_escape(line[3:])}</h2>")
+        elif line.startswith("- "):
+            if not in_list:
+                lines.append("<ul>"); in_list = True
+            lines.append(f"<li>{_inline_md(line[2:])}</li>")
+        elif line.strip():
+            if in_list:
+                lines.append("</ul>"); in_list = False
+            lines.append(f"<p>{_inline_md(line)}</p>")
+    if in_list:
+        lines.append("</ul>")
+    return "\n".join(lines)
+
+
+def _defaults_for_brief(b: dict) -> dict:
+    today = date.today().isoformat()
+    b = dict(b)
+    b.setdefault("number", "0001")
+    b.setdefault("date", today)
+    b.setdefault("client_company", "")
+    b.setdefault("client_name", "")
+    b.setdefault("meeting_type", "discovery_call")
+    b["content_html"] = _markdown_to_html(b.get("content", ""))
+    return b
+
+
 def render_proposal_html(data: dict, template: str = "proposal/default.html") -> str:
     ctx = {"proposal": _defaults_for_proposal(data), "brand": brand_mod.load()}
+    return _env().get_template(template).render(**ctx)
+
+
+def render_brief_html(data: dict, template: str = "brief/default.html") -> str:
+    ctx = {"brief": _defaults_for_brief(data), "brand": brand_mod.load()}
     return _env().get_template(template).render(**ctx)
 
 

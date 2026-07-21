@@ -153,10 +153,30 @@ checks these keys, top level and nested under `data` / `meeting` / `event`:
 match, you get `ok: false` with the keys we saw, so you can pin the right
 field on your plan in ten seconds.
 
+## Paste a raw script (webhook)
+
+`POST /webhook/fathom/script` takes a plain-text body — paste a raw Fathom
+transcript straight in, no JSON required.
+
+- If the pasted text happens to already be JSON (Fathom's own fields, or a
+  pre-digested call-intelligence payload), it's used as-is — same zero-token
+  path as `/webhook/fathom`.
+- Otherwise, one cached, fast-tier Gemini call (`gemini-flash-lite-latest`)
+  turns the transcript into the same structured shape — project, client,
+  deliverables, timeline, budget, risks, next_steps — before it enters the
+  normal capture pipeline. Works the same for a discovery call or an
+  internal meeting; `meeting_type` comes out of the extraction itself,
+  cross-checked against the "external domain in parentheses" heuristic used
+  elsewhere. No API key configured, or the call fails? Falls back to the
+  zero-token regex/keyword extraction — never breaks the capture.
+- Identical transcripts (Fathom retries, or re-testing) hit the LLM cache —
+  zero additional tokens.
+
 ## What's next
 
-- **Step 2** — Claude extraction: turn each capture into a structured client
-  record (company, budget, deliverables, pain points).
+- ~~**Step 2** — Claude extraction: turn each capture into a structured
+  client record (company, budget, deliverables, pain points).~~ Done, via
+  `/webhook/fathom/script` above (Gemini rather than Claude).
 - **Step 3** — internal brief written from the structured record.
 - **Step 4** — proposal + quote *content* auto-generated from the brief, then
   rendered into the templates you just saw.
