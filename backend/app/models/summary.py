@@ -21,23 +21,6 @@ class Summary(db.Model):
         nullable=False,
     )
 
-    proposal_id = db.Column(
-        db.Integer,
-        db.ForeignKey("proposals.proposal_id"),
-        nullable=True,
-    )
-
-    quote_id = db.Column(
-        db.Integer,
-        db.ForeignKey("quotes.quote_id"),
-        nullable=True,
-    )
-
-    quote = db.relationship(
-       "Quote",
-        back_populates="summary",
-    )
-
     first_meeting_deliverables = db.Column(
         db.JSON,
         nullable=True,
@@ -53,13 +36,29 @@ class Summary(db.Model):
         nullable=True,
     )
 
+    # ======================================
+    # Relationships
+    # ======================================
+
+    # user = db.relationship(
+    #     "User",
+    #     back_populates="summaries",
+    # )
+
+    # client = db.relationship(
+    #     "Client",
+    #     back_populates="summaries",
+    # )
+
+    # ======================================
+    # Serialization
+    # ======================================
+
     def to_dict(self):
         return {
             "summary_id": self.summary_id,
             "user_id": self.user_id,
             "client_id": self.client_id,
-            "proposal_id": self.proposal_id,
-            "quote_id": self.quote_id,
             "first_meeting_deliverables": self.first_meeting_deliverables,
             "created_at": (
                 self.created_at.isoformat()
@@ -72,3 +71,9 @@ class Summary(db.Model):
                 else None
             ),
         }
+
+    def __repr__(self):
+        return (
+            f"<Summary {self.summary_id} "
+            f"Client={self.client_id}>"
+        )
