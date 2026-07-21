@@ -9,12 +9,6 @@ class Summary(db.Model):
         primary_key=True,
     )
 
-    user_id = db.Column(
-        db.Integer,
-        db.ForeignKey("users.user_id"),
-        nullable=False,
-    )
-
     client_id = db.Column(
         db.Integer,
         db.ForeignKey("clients.client_id"),
