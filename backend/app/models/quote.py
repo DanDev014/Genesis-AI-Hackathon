@@ -63,6 +63,7 @@ class Quote(db.Model):
 
     status = db.Column(
         db.String(20),
+        nullable=False,
     )
 
     line_items = db.Column(
@@ -76,6 +77,9 @@ class Quote(db.Model):
         nullable=False,
     )
 
+    # ======================================
+    # Relationships
+    # ======================================
 
     proposal = db.relationship(
         "Proposal",
@@ -88,6 +92,14 @@ class Quote(db.Model):
         foreign_keys=[created_by_user_id],
     )
 
+    summary = db.relationship(
+        "Summary",
+        back_populates="quote",
+        uselist=False,
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+
     # ======================================
     # Serialization
     # ======================================
@@ -95,27 +107,63 @@ class Quote(db.Model):
     def to_dict(self):
         return {
             "quote_id": self.quote_id,
-            "proposal_id": self.proposal_id,
+
+            "proposal": (
+                {
+                    "proposal_id": self.proposal.proposal_id,
+                    "client_id": self.proposal.client_id,
+                    "version": self.proposal.version,
+                    "status": self.proposal.status,
+                }
+                if self.proposal
+                else None
+            ),
+
             "created_by_user_id": self.created_by_user_id,
+
             "currency": self.currency,
+
             "tax_rate": (
                 float(self.tax_rate)
                 if self.tax_rate is not None
                 else None
             ),
+
             "discount_amount": (
                 float(self.discount_amount)
                 if self.discount_amount is not None
                 else None
             ),
+
             "total_amount": (
                 float(self.total_amount)
                 if self.total_amount is not None
                 else None
             ),
+
             "validity_days": self.validity_days,
+
             "status": self.status,
+
             "line_items": self.line_items,
+
+            "summary": (
+                {
+                    "summary_id": self.summary.summary_id,
+                    "client_id": self.summary.client_id,
+                    "proposal_id": self.summary.proposal_id,
+                    "quote_id": self.summary.quote_id,
+                    "first_meeting_deliverables": self.summary.first_meeting_deliverables,
+                    "created_at": (
+                        self.summary.created_at.isoformat()
+                        if self.summary.created_at
+                        else None
+                    ),
+                }
+                if self.summary
+                else None
+            ),
+
             "created_at": (
                 self.created_at.isoformat()
                 if self.created_at
@@ -125,6 +173,7 @@ class Quote(db.Model):
 
     def __repr__(self):
         return (
-            f"<Quote {self.quote_id} "
-            f"Amount={self.total_amount} {self.currency}>"
+            f"<Quote {self.quote_id} | "
+            f"Proposal={self.proposal_id} | "
+            f"{self.currency} {self.total_amount}>"
         )
