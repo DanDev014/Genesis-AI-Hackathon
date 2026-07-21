@@ -114,7 +114,7 @@ def _capture_payload(payload: dict) -> dict:
         summary=parts["summary"],
         title=parts["title"],
         external_id=parts["external_id"],
-        raw=payload,
+        raw=parts.get("structured_root") or payload,
         meeting_type_hint=parts.get("meeting_type_hint", ""),
         extra_action_items=parts.get("action_items", []),
     )

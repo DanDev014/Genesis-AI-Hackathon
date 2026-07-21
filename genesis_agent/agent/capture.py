@@ -159,29 +159,57 @@ def extract_structured_via_llm(text: str) -> Optional[dict]:
     return result if isinstance(result, dict) else None
 
 
+# Containers a structured payload is commonly found wrapped inside — our own
+# /webhook/fathom response shape ("ok"/"captured"/"key_points") if someone
+# pastes it back in, plus the generic wrappers _walk_for already knows about.
+WRAPPER_KEYS = ["captured", "key_points", "data", "payload", "event", "result"]
+
+
+def _find_structured_root(payload: dict, depth: int = 2) -> dict:
+    """Return `payload`, or a dict nested up to `depth` levels under one of
+    WRAPPER_KEYS, whichever one actually looks like a structured
+    call-intelligence payload. Falls back to `payload` unchanged."""
+    if _is_structured_payload(payload):
+        return payload
+    if depth <= 0 or not isinstance(payload, dict):
+        return payload
+    for key in WRAPPER_KEYS:
+        inner = payload.get(key)
+        if isinstance(inner, dict):
+            found = _find_structured_root(inner, depth - 1)
+            if _is_structured_payload(found):
+                return found
+    return payload
+
+
 def extract_from_payload(payload: dict) -> dict:
     """Pull the summary + title + a stable id out of a webhook payload.
 
     Falls back to flattening a structured call-intelligence JSON (no flat
     summary/transcript field, but meeting/client/project/... sections) into
     readable text, and pulls meeting_type + action_items straight from that
-    structure — more reliable than inferring them from free text."""
+    structure — more reliable than inferring them from free text. Also
+    unwraps a payload someone accidentally nested under "captured" /
+    "key_points" (e.g. reposting our own webhook response)."""
     summary = _walk_for(payload, SUMMARY_KEYS)
     title = _walk_for(payload, TITLE_KEYS)
     external_id = _walk_for(payload, ID_KEYS)
     meeting_type_hint = ""
     action_items: list = []
+    structured_root = None
 
-    if not summary and _is_structured_payload(payload):
-        summary = _flatten_structured_payload(payload)
-        meeting = payload.get("meeting") or {}
-        project = payload.get("project") or {}
-        client = payload.get("client") or {}
+    root = _find_structured_root(payload) if not summary else payload
+    if not summary and _is_structured_payload(root):
+        structured_root = root
+        summary = _flatten_structured_payload(root)
+        meeting = root.get("meeting") or {}
+        project = root.get("project") or {}
+        client = root.get("client") or {}
         title = title or project.get("name") or meeting.get("title") or client.get("company") or ""
         mt = str(meeting.get("meeting_type", "")).lower()
         if mt:
             meeting_type_hint = "internal" if "internal" in mt else "discovery_call"
-        action_items = _action_items_from_structured(payload)
+        action_items = _action_items_from_structured(root)
 
     return {
         "summary": summary,
@@ -189,6 +217,7 @@ def extract_from_payload(payload: dict) -> dict:
         "external_id": external_id,
         "meeting_type_hint": meeting_type_hint,
         "action_items": action_items,
+        "structured_root": structured_root,
     }
 
 
