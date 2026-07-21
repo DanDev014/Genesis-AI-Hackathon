@@ -76,9 +76,9 @@ class Proposal(db.Model):
         nullable=False,
     )
 
-    # ======================================
+    # ==================================================
     # Relationships
-    # ======================================
+    # ==================================================
 
     client = db.relationship(
         "Client",
@@ -103,22 +103,36 @@ class Proposal(db.Model):
         passive_deletes=True,
     )
 
-    # ======================================
+    # ==================================================
     # Serialization
-    # ======================================
+    # ==================================================
 
     def to_dict(self):
         return {
             "proposal_id": self.proposal_id,
-            "client_id": self.client_id,
+
+            "client": (
+                {
+                    "client_id": self.client.client_id,
+                    "name": self.client.name,
+                    "company": self.client.company,
+                }
+                if self.client
+                else None
+            ),
+
             "created_by_user_id": self.created_by_user_id,
             "linked_transcript_id": self.linked_transcript_id,
+
+            # Cleaner API names
             "scope_of_work": self.scope_of_work,
-            "deliverables_list": self.deliverables_list,
-            "timeline_milestones": self.timeline_milestones,
+            "deliverables": self.deliverables_list,
+            "timeline": self.timeline_milestones,
+
             "version": self.version,
             "status": self.status,
             "generated_by": self.generated_by,
+
             "created_at": (
                 self.created_at.isoformat()
                 if self.created_at
