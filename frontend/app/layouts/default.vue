@@ -37,7 +37,12 @@
     <div class="flex min-h-screen flex-1 flex-col bg-white w-[100%]">
       <UDashboardNavbar class="w-[100%]" :ui="{ root: 'border-b-0' }">
         <template #right>
-          <UButton label="Logout" class="text-white" />
+          <UButton
+            label="Logout"
+            class="text-white"
+            @click="onLoginClick"
+            :loading="loading"
+          />
         </template>
       </UDashboardNavbar>
 
@@ -53,6 +58,10 @@
 </template>
 
 <script setup lang="ts">
+const authStore = useAuthStore();
+const loading = ref(false);
+const toast = useToast();
+
 const links = [
   {
     label: "Dashboard",
@@ -70,4 +79,22 @@ const links = [
     to: "/proposals",
   },
 ];
+
+const onLoginClick = async () => {
+  loading.value = true;
+
+  try {
+    await authStore.logout();
+    toast.add({
+      title: "Logout successful",
+      description: "Redirecting to login page",
+      color: "success",
+      icon: "i-lucide-check-circle",
+    });
+  } catch (error) {
+    console.error("Error logging out", error);
+  } finally {
+    loading.value = false;
+  }
+};
 </script>
