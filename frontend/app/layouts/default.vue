@@ -1,5 +1,5 @@
 <template>
-  <UDashboardGroup>
+  <UDashboardGroup class="h-screen">
     <UDashboardSidebar
       class="bg-black text-white border-r border-neutral-800"
       :ui="{ root: 'w-72' }"
@@ -39,8 +39,11 @@
       </UDashboardSidebarFooter>
     </UDashboardSidebar>
 
-    <div class="flex min-h-screen flex-1 flex-col bg-white w-[100%]">
-      <UDashboardNavbar class="w-[100%]" :ui="{ root: 'border-b-0' }">
+    <div class="flex h-full min-h-0 flex-1 flex-col bg-white w-[100%]">
+      <UDashboardNavbar
+        class="w-[100%] shrink-0"
+        :ui="{ root: 'border-b-0' }"
+      >
         <template #right>
           <UButton
             label="Logout"
@@ -51,9 +54,9 @@
         </template>
       </UDashboardNavbar>
 
-      <UDashboardPanel>
-        <UDashboardPanelContent>
-          <div class="w-full min-h-screen bg-white text-black">
+      <UDashboardPanel class="flex min-h-0 flex-1 flex-col">
+        <UDashboardPanelContent class="min-h-0 flex-1 overflow-y-auto">
+          <div class="w-full bg-white text-black">
             <slot />
           </div>
         </UDashboardPanelContent>
@@ -66,12 +69,16 @@
 const authStore = useAuthStore();
 const loading = ref(false);
 const toast = useToast();
-
 const links = [
   {
     label: "Dashboard",
     icon: "i-lucide-layout-dashboard",
     to: "/dashboard",
+  },
+  {
+    label: "Kora AI",
+    icon: "i-lucide-sparkles",
+    to: "/kora-ai",
   },
   {
     label: "Clients",
@@ -82,6 +89,16 @@ const links = [
     label: "Proposals",
     icon: "i-lucide-file-text",
     to: "/proposals",
+  },
+  {
+    label: "Summaries",
+    icon: "i-lucide-file-search",
+    to: "/summaries",
+  },
+  {
+    label: "Quotations",
+    icon: "i-lucide-receipt-text",
+    to: "/quotations",
   },
 ];
 
