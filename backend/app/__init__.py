@@ -2,9 +2,13 @@ from flask import Flask
 from sqlalchemy import text
 from .routes.auth import auth_bp
 from .routes.clients import clients_bp
+from .routes.call_record import call_records_bp
 
 from .config import Config
 from .extensions import db, migrate, jwt, cors
+
+from app.exceptions import AppError
+from app.utils.responses import error_response
 
 
 
@@ -27,8 +31,20 @@ def create_app():
         db.session.execute(text("SELECT 1"))
         return {"database": "Connected successfully"}
 
+    @app.errorhandler(AppError)
+    def handle_app_error(error):
+        return error_response(
+        error.message,
+        error.status_code,
+    )
+
 
     app.register_blueprint(auth_bp, url_prefix="/api")
     app.register_blueprint(clients_bp, url_prefix="/api")
+    app.register_blueprint(call_records_bp, url_prefix="/api")
+    app.register_blueprint(proposals_bp, url_prefix="/api")
+    app.register_blueprint(quotes_bp, url_prefix="/api")
+    app.register_blueprint(team_members_bp, url_prefix="/api")
+    app.register_blueprint(transcripts_bp, url_prefix="/api")
 
     return app

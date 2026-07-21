@@ -2,6 +2,8 @@ from sqlalchemy import or_
 
 from app.models.client import Client
 
+from app.exceptions import ResourceNotFound
+
 
 class ClientService:
 
@@ -109,7 +111,7 @@ class ClientService:
         client = Client.query.get(client_id)
 
         if client is None:
-            return None
+            raise ResourceNotFound("Client not found")
 
         manager = None
 
