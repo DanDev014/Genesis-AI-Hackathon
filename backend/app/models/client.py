@@ -67,9 +67,9 @@ class Client(db.Model):
         nullable=False,
     )
 
-    # ======================================
+    # ==================================================
     # Relationships
-    # ======================================
+    # ==================================================
 
     user = db.relationship(
         "User",
@@ -95,11 +95,20 @@ class Client(db.Model):
         passive_deletes=True,
     )
 
-    # ======================================
+    # ==================================================
     # Serialization
-    # ======================================
+    # ==================================================
 
     def to_dict(self):
+        latest_call = (
+            max(
+                self.calls,
+                key=lambda c: c.meeting_time,
+            )
+            if self.calls
+            else None
+        )
+
         return {
             "client_id": self.client_id,
             "user_id": self.user_id,
@@ -110,7 +119,19 @@ class Client(db.Model):
             "email": self.email,
             "source": self.source,
             "status": self.status,
-            "assigned_account_manager": self.assigned_account_manager,
+            "assigned_account_manager": (
+                {
+                    "staff_id": self.account_manager.staff_id,
+                    "full_name": self.account_manager.full_name,
+                }
+                if self.account_manager
+                else None
+            ),
+            "last_call_at": (
+                latest_call.meeting_time.isoformat()
+                if latest_call
+                else None
+            ),
             "created_at": (
                 self.created_at.isoformat()
                 if self.created_at

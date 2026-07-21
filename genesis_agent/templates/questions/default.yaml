@@ -38,7 +38,7 @@ items:
   - id: success_metrics
     topic: Success metrics
     priority: high
-    signals: [kpi, metric, measure, success, target, growth, conversion, revenue goal, sales goal, "how we'll know"]
+    signals: [kpi, metric, measure, success, growth, conversion, revenue goal, sales goal, "how we'll know"]
     question: "How will you know this project has been successful three months after launch?"
     why: "Without a metric, 'good' becomes subjective in reviews."
 

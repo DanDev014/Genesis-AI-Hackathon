@@ -28,7 +28,7 @@ from pathlib import Path
 
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import Body, FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, Response, RedirectResponse
 
 from agent import brand as brand_mod
@@ -38,6 +38,9 @@ from fastapi.responses import RedirectResponse
 import json as _json
 
 _pages = Jinja2Templates(directory='templates')
+# Newer Starlette TemplateResponse + Jinja2's LRUCache put an unhashable dict
+# into the cache key (pallets/jinja#2180). Disabling the cache sidesteps it.
+_pages.env.cache = None
 
 app = FastAPI(title="Genesis meeting-intelligence agent")
 
@@ -99,13 +102,7 @@ def capture_questions(name: str):
     return questions.analyse(data.get("summary", ""))
 
 
-@app.post("/webhook/fathom")
-async def fathom_webhook(request: Request):
-    try:
-        payload = await request.json()
-    except Exception:
-        raise HTTPException(400, "Body must be JSON.")
-
+def _capture_payload(payload: dict) -> dict:
     parts = capture.extract_from_payload(payload)
     if not parts["summary"]:
         return {"ok": False,
@@ -117,9 +114,39 @@ async def fathom_webhook(request: Request):
         summary=parts["summary"],
         title=parts["title"],
         external_id=parts["external_id"],
-        raw=payload,
+        raw=parts.get("structured_root") or payload,
+        meeting_type_hint=parts.get("meeting_type_hint", ""),
+        extra_action_items=parts.get("action_items", []),
     )
     return {"ok": True, "captured": record}
+
+
+@app.post("/webhook/fathom")
+async def fathom_webhook(payload: dict = Body(...)):
+    """For automations that already send JSON — Fathom's own fields, or a
+    pre-digested call-intelligence payload. Zero LLM tokens either way."""
+    return _capture_payload(payload)
+
+
+@app.post("/webhook/fathom/script")
+async def fathom_webhook_script(text: str = Body(..., media_type="text/plain")):
+    """For pasting a raw script/transcript straight from Fathom — no JSON
+    required. If it happens to already be JSON, that's used directly (zero
+    tokens, same as /webhook/fathom). Otherwise one cached, fast-tier LLM
+    call turns it into the same structured shape before it enters the
+    normal capture pipeline — works the same for a discovery call or an
+    internal meeting; meeting_type comes out of the extraction itself."""
+    text = (text or "").strip()
+    if not text:
+        return {"ok": False, "reason": "Empty body."}
+
+    try:
+        parsed = json.loads(text)
+        payload = parsed if isinstance(parsed, dict) else {"transcript": text}
+    except Exception:
+        payload = capture.extract_structured_via_llm(text) or {"transcript": text}
+
+    return _capture_payload(payload)
 
 
 # --------------------------- branded document rendering ---------------------------
@@ -231,7 +258,7 @@ def preview_quote():
 def page_proposals(request: Request):
     ctx = {"request": request, "brand": brand_mod.load(),
            "proposals": store.list_proposals()}
-    return _pages.TemplateResponse("pages/proposals_list.html", ctx)
+    return _pages.TemplateResponse(request, "pages/proposals_list.html", ctx)
 
 
 @app.get("/quotes", response_class=HTMLResponse)
@@ -240,7 +267,7 @@ def page_quotes(request: Request):
            "quotes": store.list_quotes(),
            "qb_mode": quickbooks.mode(),
            "qb_configured": quickbooks.is_configured()}
-    return _pages.TemplateResponse("pages/quotes_list.html", ctx)
+    return _pages.TemplateResponse(request, "pages/quotes_list.html", ctx)
 
 
 @app.get("/proposals/{doc_id}", response_class=HTMLResponse)
@@ -293,7 +320,7 @@ def quickbooks_preview(request: Request, doc_id: str):
     ctx = {"request": request, "brand": brand_mod.load(),
            "quote": doc, "result": result,
            "payload_json": _json.dumps(result.get("payload", {}), indent=2)}
-    return _pages.TemplateResponse("pages/quickbooks_preview.html", ctx)
+    return _pages.TemplateResponse(request, "pages/quickbooks_preview.html", ctx)
 
 
 @app.get("/quickbooks/status")
@@ -330,7 +357,12 @@ def brief_from_capture(name: str):
 
     # Extract client from the capture's title if available.
     title = data.get("title") or "New client"
-    generated = brief_mod.generate_brief(summary, client_company=title)
+    meeting_type = data.get("meeting_type", "discovery_call")
+    generated = brief_mod.generate_brief(
+        summary, client_company=title,
+        meeting_type=meeting_type, action_items=data.get("action_items", []),
+    )
+    generated["meeting_type"] = meeting_type
 
     if db.is_available():
         try:
@@ -339,8 +371,10 @@ def brief_from_capture(name: str):
                 client_name="",
                 content=generated["content"],
                 clarity_score=generated["clarity_score"],
+                meeting_type=meeting_type,
             )
-            return {"ok": True, "storage": "db", "brief": saved, "mode": generated["mode"]}
+            return {"ok": True, "storage": "db", "brief": saved, "mode": generated["mode"],
+                    "meeting_type": meeting_type}
         except Exception as exc:
             return {"ok": True, "storage": "memory", "brief": generated, "warning": str(exc)}
     return {"ok": True, "storage": "memory", "brief": generated}
@@ -373,6 +407,120 @@ def approve_brief(brief_id: str):
     return {"ok": True, "brief": b}
 
 
+@app.get("/briefs/{brief_id}/html", response_class=HTMLResponse)
+def brief_html(brief_id: str):
+    """Printable version of a stored brief — the discovery call's brief or
+    the internal meeting's recap — so it can be pulled up (or printed to
+    PDF from the browser) ahead of the next meeting."""
+    if not db.is_available():
+        raise HTTPException(503, "DB unavailable.")
+    b = db.get_brief(brief_id)
+    if not b:
+        raise HTTPException(404, "Brief not found.")
+    b["number"] = f"{b['brief_id']:04d}"
+    return HTMLResponse(renderer.render_brief_html(b))
+
+
+@app.get("/briefs/{brief_id}/pdf")
+def brief_pdf(brief_id: str):
+    if not db.is_available():
+        raise HTTPException(503, "DB unavailable.")
+    b = db.get_brief(brief_id)
+    if not b:
+        raise HTTPException(404, "Brief not found.")
+    b["number"] = f"{b['brief_id']:04d}"
+    html = renderer.render_brief_html(b)
+    pdf = renderer.render_pdf(html)
+    if pdf is None:
+        raise HTTPException(501, "WeasyPrint isn't installed. Use /briefs/{id}/html instead.")
+    return Response(content=pdf, media_type="application/pdf",
+                    headers={"Content-Disposition": 'inline; filename="brief.pdf"'})
+
+
+def _safe_qty(v) -> int:
+    try:
+        return int(v)
+    except (TypeError, ValueError):
+        return 1
+
+
+def _proposal_data_from_key_points(title: str, key_points: dict) -> dict:
+    """Map a capture's key_points onto the shape db.save_proposal expects.
+    Structured payloads have a real 'deliverables' section; a plain
+    transcript capture only has action_items, so that's the fallback."""
+    client = key_points.get("client") or {}
+    project = key_points.get("project") or {}
+    deliverables = []
+    for d in key_points.get("deliverables") or []:
+        if isinstance(d, dict):
+            bits = [d.get("name", ""), d.get("duration", ""),
+                    f"x{d['quantity']}" if d.get("quantity") else ""]
+            deliverables.append(" — ".join(b for b in bits if b))
+        else:
+            deliverables.append(str(d))
+    if not deliverables:
+        deliverables = [a["text"] if isinstance(a, dict) else str(a)
+                         for a in key_points.get("action_items", [])]
+
+    timeline = key_points.get("timeline")
+    if isinstance(timeline, dict):
+        timeline = "; ".join(f"{k.replace('_', ' ')}: {v}" for k, v in timeline.items())
+
+    return {
+        "client_company": client.get("company") or title,
+        "client_name": client.get("primary_contact", ""),
+        "title": project.get("name") or title,
+        "scope": project.get("objective") or "",
+        "deliverables": deliverables,
+        "timeline": timeline or "",
+        "status": "draft",
+    }
+
+
+def _quote_line_items_from_key_points(key_points: dict) -> list:
+    items = []
+    for d in key_points.get("deliverables") or []:
+        if isinstance(d, dict):
+            items.append({"item": d.get("name", "Deliverable"),
+                          "qty": _safe_qty(d.get("quantity", 1)), "unit_price": 0})
+        else:
+            items.append({"item": str(d), "qty": 1, "unit_price": 0})
+    if not items:
+        items = [{"item": a["text"] if isinstance(a, dict) else str(a), "qty": 1, "unit_price": 0}
+                 for a in key_points.get("action_items", [])]
+    return items
+
+
+@app.post("/proposals/from-capture/{name}")
+def proposal_from_capture(name: str):
+    """Turn a capture's key_points — typically the internal meeting where
+    the team locks scope and pricing — into a draft proposal plus a
+    companion draft quote (line items priced at 0). A manager fills in
+    pricing via PUT /quotes/{id} before sending it through /approve."""
+    if not db.is_available():
+        raise HTTPException(503, "DB unavailable.")
+    cap_file = capture.CAPTURES_DIR / name
+    if not cap_file.exists():
+        raise HTTPException(404, "Capture not found.")
+    import json as _j
+    data = _j.loads(cap_file.read_text(encoding="utf-8"))
+    key_points = data.get("key_points") or {}
+    title = data.get("title") or "New client"
+
+    try:
+        proposal = db.save_proposal(_proposal_data_from_key_points(title, key_points))
+    except Exception as exc:
+        raise HTTPException(422, f"Could not draft proposal: {exc}")
+
+    quote = db.save_quote({
+        "proposal_id": int(proposal["id"]),
+        "line_items": _quote_line_items_from_key_points(key_points),
+        "currency": (key_points.get("budget") or {}).get("currency", "KES"),
+        "status": "draft",
+    })
+    return {"ok": True, "proposal": proposal, "quote": quote}
+
+
 # --------------------------- approval gate ---------------------------
 @app.post("/proposals/{proposal_id}/approve")
 def approve_proposal(proposal_id: str):
@@ -383,9 +531,35 @@ def approve_proposal(proposal_id: str):
     if not p:
         raise HTTPException(404, "Proposal not found.")
     db.log_activity(int(proposal_id), "approved", notes="Producer approved")
-    db.update_proposal(proposal_id, {"status": "internal_review"})
     return {"ok": True, "proposal_id": proposal_id,
             "message": "Approved. Send-to-QuickBooks is now unlocked."}
+
+
+@app.put("/proposals/{proposal_id}")
+def edit_proposal(proposal_id: str, patch: dict = Body(...)):
+    """Manager edits to a draft — scope / deliverables / timeline — while
+    it waits for approval. Blocked once approved so the audit trail can't
+    be quietly rewritten after a producer has signed off."""
+    if not db.is_available():
+        raise HTTPException(503, "DB unavailable.")
+    p = db.get_proposal(proposal_id)
+    if not p:
+        raise HTTPException(404, "Proposal not found.")
+    if "status" not in patch and db.proposal_is_approved(int(proposal_id)):
+        raise HTTPException(409, "Proposal already approved — edits no longer apply retroactively.")
+    return {"ok": True, "proposal": db.update_proposal(proposal_id, patch)}
+
+
+@app.put("/quotes/{quote_id}")
+def edit_quote(quote_id: str, patch: dict = Body(...)):
+    """Manager edits to a draft quote — line items, tax, discount, currency,
+    validity — while its linked proposal waits for approval."""
+    if not db.is_available():
+        raise HTTPException(503, "DB unavailable.")
+    q = db.get_quote(quote_id)
+    if not q:
+        raise HTTPException(404, "Quote not found.")
+    return {"ok": True, "quote": db.update_quote(quote_id, patch)}
 
 
 @app.get("/proposals/{proposal_id}/history")
@@ -423,11 +597,9 @@ def dashboard_data():
 
 @app.get("/dashboard/view", response_class=HTMLResponse)
 def dashboard_view(request: Request):
-    from fastapi.templating import Jinja2Templates
-    pages = Jinja2Templates(directory="templates")
     data = dashboard_data()
     ctx = {"request": request, "brand": brand_mod.load(),
            "metrics": data["metrics"], "storage": data["storage"],
            "cost": llm_client.cost_report(),
            "db_status": db.status()}
-    return pages.TemplateResponse("pages/dashboard.html", ctx)
+    return _pages.TemplateResponse(request, "pages/dashboard.html", ctx)

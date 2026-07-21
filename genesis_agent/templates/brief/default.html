@@ -1,0 +1,17 @@
+{% import "_base.html" as base with context %}
+{{ base.doc_head("Brief — " ~ (brief.client_company or brief.client_name or "Untitled")) }}
+{{ base.header("Internal recap" if brief.meeting_type == "internal" else "Project brief", "B-" ~ brief.number, brief.date) }}
+
+<section class="cover">
+  <div class="eyebrow">{{ "Internal team meeting" if brief.meeting_type == "internal" else "Client & context" }}</div>
+  <h1 class="title">{{ brief.client_company or brief.client_name or "Untitled project" }}</h1>
+  {% if brief.clarity_score is not none %}
+  <div style="margin-top:14px"><span class="stamp draft">clarity {{ brief.clarity_score | round | int }}%</span></div>
+  {% endif %}
+</section>
+
+<section>
+  {{ brief.content_html | safe }}
+</section>
+
+{{ base.footer() }}

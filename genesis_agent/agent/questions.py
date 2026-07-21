@@ -29,14 +29,28 @@ def load_template(path: Optional[Path] = None) -> dict:
     return yaml.safe_load(p.read_text(encoding="utf-8")) or {"items": []}
 
 
+_ALNUM_SIGNAL_RE = re.compile(r"^[a-z0-9][a-z0-9 '-]*[a-z0-9]$|^[a-z0-9]$")
+_word_pattern_cache: dict = {}
+
+
 def _covered(summary_lc: str, signals: list) -> Optional[str]:
     """Return the first matching signal, or None if nothing matched."""
     for s in signals or []:
         s = str(s).lower().strip()
         if not s:
             continue
-        # Match as substring; short signals ("$", "vs ") are common and useful.
-        if s in summary_lc:
+        # Plain alphanumeric signals ("ceo", "ip", "support") need word
+        # boundaries — otherwise "ceo" matches inside "voiceover" and "ip"
+        # matches inside "clip". Signals with symbols ("$", "vs ") don't have
+        # clean word boundaries, so those stay substring matches.
+        if _ALNUM_SIGNAL_RE.match(s):
+            pattern = _word_pattern_cache.get(s)
+            if pattern is None:
+                pattern = re.compile(r"(?<![a-z0-9])" + re.escape(s) + r"(?![a-z0-9])")
+                _word_pattern_cache[s] = pattern
+            if pattern.search(summary_lc):
+                return s
+        elif s in summary_lc:
             return s
     return None
 

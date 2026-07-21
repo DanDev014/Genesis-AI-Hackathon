@@ -27,8 +27,12 @@ import time
 from typing import Optional
 
 API_KEY = os.getenv("GEMINI_API_KEY")
-MODEL_SMART = os.getenv("LLM_SMART", "gemini-1.5-pro")
-MODEL_FAST = os.getenv("LLM_FAST", "gemini-1.5-flash")
+# The 1.5 series was fully retired — every call to it 404s. "-latest" aliases
+# track whatever Google's current stable release is, so this doesn't go
+# stale again. Flash-Lite for "fast" since our fast-tier calls (brief
+# generation, script->JSON extraction) are schema-following, not creative.
+MODEL_SMART = os.getenv("LLM_SMART", "gemini-pro-latest")
+MODEL_FAST = os.getenv("LLM_FAST", "gemini-flash-lite-latest")
 
 # Rough public per-million-token prices in USD. Used only for the meter,
 # not for anything customer-facing. Gemini's free tier is $0 up to its rate
