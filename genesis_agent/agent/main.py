@@ -24,6 +24,10 @@ import json
 from pathlib import Path
 
 from dotenv import load_dotenv
+from pathlib import Path
+
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, Response, RedirectResponse
 
@@ -34,8 +38,6 @@ from fastapi.responses import RedirectResponse
 import json as _json
 
 _pages = Jinja2Templates(directory='templates')
-
-load_dotenv()
 
 app = FastAPI(title="Genesis meeting-intelligence agent")
 
