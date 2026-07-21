@@ -38,6 +38,9 @@ from fastapi.responses import RedirectResponse
 import json as _json
 
 _pages = Jinja2Templates(directory='templates')
+# Newer Starlette TemplateResponse + Jinja2's LRUCache put an unhashable dict
+# into the cache key (pallets/jinja#2180). Disabling the cache sidesteps it.
+_pages.env.cache = None
 
 app = FastAPI(title="Genesis meeting-intelligence agent")
 
