@@ -1,9 +1,5 @@
-// https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
-  modules: [
-    '@nuxt/eslint',
-    '@nuxt/ui'
-  ],
+  modules: ['@nuxt/eslint', '@nuxt/ui', '@pinia/nuxt'],
 
   devtools: {
     enabled: true
@@ -14,7 +10,9 @@ export default defineNuxtConfig({
   routeRules: {
     '/': { prerender: true }
   },
-
+  runtimeConfig: {
+    apiBaseUrl: process.env.API_BASE_URL
+  },
   compatibilityDate: '2026-06-30',
 
   eslint: {

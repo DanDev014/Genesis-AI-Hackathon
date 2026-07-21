@@ -1,5 +1,6 @@
 from flask import Blueprint, request, jsonify
 from werkzeug.security import check_password_hash
+from app.models.user import User
 
 auth_bp = Blueprint("auth", __name__)
 
@@ -18,7 +19,7 @@ def login():
 
     user = User.query.filter_by(email=email).first()
 
-    if user is None or not check_password_hash(user.password_hash, password):
+    if user is None or not user.check_password(password):
         return jsonify({
             "error": "Invalid email or password"
         }), 401

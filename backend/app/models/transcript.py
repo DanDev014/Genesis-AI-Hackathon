@@ -62,12 +62,6 @@ class Transcript(db.Model):
         nullable=False,
     )
 
-    created_at = db.Column(
-        db.DateTime(timezone=True),
-        default=datetime.utcnow,
-        nullable=False,
-    )
-
     # ======================================
     # Relationships
     # ======================================
@@ -108,11 +102,7 @@ class Transcript(db.Model):
             ),
             "summary": self.summary,
             "extracted_fields": self.extracted_fields,
-            "created_at": (
-                self.created_at.isoformat()
-                if self.created_at
-                else None
-            ),
+            
         }
 
     def __repr__(self):
