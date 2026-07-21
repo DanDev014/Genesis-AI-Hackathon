@@ -1,6 +1,9 @@
 <template>
   <UDashboardGroup>
-    <UDashboardSidebar class="bg-black text-white border-r border-neutral-800">
+    <UDashboardSidebar
+      class="bg-black text-white border-r border-neutral-800"
+      :ui="{ root: 'w-72' }"
+    >
       <!-- Logo -->
       <UDashboardSidebarHeader>
         <div>Logo</div>
@@ -27,7 +30,9 @@
           <UAvatar src="https://i.pravatar.cc/100" alt="User" size="lg" />
 
           <div class="flex flex-col">
-            <span class="font-semibold text-white"> John Doe </span>
+            <span class="font-semibold text-xs text-white">
+              {{ authStore.user.email }}
+            </span>
             <span class="text-sm text-gray-400"> Administrator </span>
           </div>
         </div>
@@ -40,7 +45,7 @@
           <UButton
             label="Logout"
             class="text-white"
-            @click="onLoginClick"
+            @click="onLogoutClick"
             :loading="loading"
           />
         </template>
@@ -80,7 +85,7 @@ const links = [
   },
 ];
 
-const onLoginClick = async () => {
+const onLogoutClick = async () => {
   loading.value = true;
 
   try {

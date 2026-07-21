@@ -35,7 +35,31 @@
       v-if="pending"
       class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
     >
-      <USkeleton v-for="i in 6" :key="i" class="h-32 w-full rounded-lg" />
+      <UCard
+        v-for="i in 9"
+        :key="i"
+        :ui="{ root: 'ring-0 bg-white shadow-md overflow-hidden' }"
+      >
+        <div class="flex items-start justify-between mb-3">
+          <div class="space-y-2">
+            <USkeleton class="h-4 w-32 bg-neutral-100" />
+            <USkeleton class="h-3 w-24 bg-neutral-100" />
+          </div>
+          <USkeleton class="h-5 w-16 rounded-full bg-neutral-100" />
+        </div>
+
+        <div class="flex items-center gap-2 mb-3">
+          <USkeleton class="h-4 w-4 rounded-full bg-neutral-100" />
+          <USkeleton class="h-3 w-20 bg-neutral-100" />
+        </div>
+
+        <div
+          class="flex items-center justify-between pt-3 border-t border-neutral-200"
+        >
+          <USkeleton class="h-3 w-24 bg-neutral-100" />
+          <USkeleton class="h-3 w-16 bg-neutral-100" />
+        </div>
+      </UCard>
     </div>
 
     <!-- Error — surfaces the real DB/backend message from apiRequest -->
@@ -132,7 +156,7 @@ const statusOptions = [
 ];
 
 // Calls the BFF route (server/api/clients/index.get.ts), which proxies to Flask
-const { data, pending, error, refresh } = await useFetch("/api/clients");
+const { data, pending, error, refresh } = await useLazyFetch("/api/clients");
 
 const clients = computed(() => data.value?.data ?? []);
 
