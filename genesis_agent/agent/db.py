@@ -143,8 +143,14 @@ def _ensure_extras() -> None:
                 version        integer default 1,
                 approved_by    integer,
                 approved_at    timestamptz,
+                meeting_type   varchar(20) default 'discovery_call',
                 created_at     timestamptz default current_timestamp
             )
+        """)
+        # Older deployments created the table before meeting_type existed.
+        cur.execute("""
+            alter table project_briefs
+              add column if not exists meeting_type varchar(20) default 'discovery_call'
         """)
 
 
@@ -264,6 +270,10 @@ def get_proposal(doc_id: str) -> Optional[dict]:
 
 
 def update_proposal(doc_id: str, patch: dict) -> Optional[dict]:
+    """Apply a partial update. 'status' drives the approval workflow; the
+    rest (scope/deliverables/timeline) let a manager revise a draft before
+    approving it — logged as a single 'edited' activity entry, distinct
+    from the status-change entry so the audit trail reads clearly."""
     pid = _int(doc_id)
     if pid is None:
         return None
@@ -271,6 +281,17 @@ def update_proposal(doc_id: str, patch: dict) -> Optional[dict]:
         _exec("update proposals set status = %s where proposal_id = %s",
               (patch["status"], pid))
         log_activity(pid, _status_to_action(patch["status"]), notes=patch.get("notes", ""))
+    if "scope" in patch:
+        _exec("update proposals set scope_of_work = %s where proposal_id = %s",
+              (patch["scope"], pid))
+    if "deliverables" in patch:
+        _exec("update proposals set deliverables_list = %s::jsonb where proposal_id = %s",
+              (json.dumps(patch["deliverables"]), pid))
+    if "timeline" in patch:
+        _exec("update proposals set timeline_milestones = %s::jsonb where proposal_id = %s",
+              (json.dumps(_timeline_json(patch)), pid))
+    if any(k in patch for k in ("scope", "deliverables", "timeline")):
+        log_activity(pid, "edited", notes=patch.get("notes", "Manager edit"))
     return get_proposal(doc_id)
 
 
@@ -408,12 +429,35 @@ def get_quote(doc_id: str) -> Optional[dict]:
 
 
 def update_quote(doc_id: str, patch: dict) -> Optional[dict]:
+    """Apply a partial update. line_items also recomputes total_amount so a
+    manager's pricing edit stays consistent with what gets quoted."""
     qid = _int(doc_id)
     if qid is None:
         return None
     if "status" in patch:
         _exec("update quotes set status = %s where quote_id = %s",
               (patch["status"], qid))
+    if "line_items" in patch:
+        items = []
+        for it in patch["line_items"]:
+            it = dict(it)
+            it.setdefault("qty", 1)
+            it.setdefault("unit_price", 0)
+            it["amount"] = it.get("amount") or round(it["qty"] * it["unit_price"], 2)
+            items.append(it)
+        total = round(sum(i["amount"] for i in items), 2)
+        _exec("update quotes set line_items = %s::jsonb, total_amount = %s where quote_id = %s",
+              (json.dumps(items), total, qid))
+    if "tax_rate" in patch:
+        _exec("update quotes set tax_rate = %s where quote_id = %s", (float(patch["tax_rate"]), qid))
+    if "discount_amount" in patch:
+        _exec("update quotes set discount_amount = %s where quote_id = %s",
+              (float(patch["discount_amount"]), qid))
+    if "currency" in patch:
+        _exec("update quotes set currency = %s where quote_id = %s", (patch["currency"][:5], qid))
+    if "validity_days" in patch:
+        _exec("update quotes set validity_days = %s where quote_id = %s",
+              (int(patch["validity_days"]), qid))
     if "quickbooks" in patch:
         r = _one("select line_items from quotes where quote_id = %s", (qid,))
         if r:
@@ -433,16 +477,17 @@ def update_quote(doc_id: str, patch: dict) -> Optional[dict]:
 # --------------------------------------------------------------------------
 def save_brief(client_company: str, client_name: str, content: str,
                clarity_score: Optional[float] = None,
-               transcript_id: Optional[int] = None) -> dict:
+               transcript_id: Optional[int] = None,
+               meeting_type: str = "discovery_call") -> dict:
     client_id = _client_id_for(client_company, client_name, "")
     if not client_id:
         raise RuntimeError("Cannot save brief — need client_company or client_name.")
     row = _exec("""
         insert into project_briefs
-          (client_id, transcript_id, content, clarity_score, status, version, created_at)
-        values (%s, %s, %s, %s, 'draft', 1, %s)
+          (client_id, transcript_id, content, clarity_score, status, version, meeting_type, created_at)
+        values (%s, %s, %s, %s, 'draft', 1, %s, %s)
         returning brief_id, created_at
-    """, (client_id, transcript_id, content, clarity_score,
+    """, (client_id, transcript_id, content, clarity_score, meeting_type,
           datetime.now(timezone.utc)))
     return {
         "id": str(row["brief_id"]),
@@ -451,6 +496,7 @@ def save_brief(client_company: str, client_name: str, content: str,
         "content": content,
         "clarity_score": clarity_score,
         "status": "draft",
+        "meeting_type": meeting_type,
         "created_at": row["created_at"].isoformat(),
     }
 
@@ -458,7 +504,7 @@ def save_brief(client_company: str, client_name: str, content: str,
 def list_briefs() -> List[dict]:
     rows = _rows("""
         select b.brief_id, b.content, b.clarity_score, b.status, b.created_at,
-               b.approved_at, c.company as client_company, c.name as client_name
+               b.approved_at, b.meeting_type, c.company as client_company, c.name as client_name
         from project_briefs b
         left join clients c on c.client_id = b.client_id
         order by b.brief_id desc
@@ -503,6 +549,7 @@ def _brief_row(r: dict) -> dict:
         "status": r.get("status") or "draft",
         "created_at": r["created_at"].isoformat() if r.get("created_at") else "",
         "approved_at": r["approved_at"].isoformat() if r.get("approved_at") else None,
+        "meeting_type": r.get("meeting_type") or "discovery_call",
         "client_company": r.get("client_company") or "",
         "client_name": r.get("client_name") or "",
     }
