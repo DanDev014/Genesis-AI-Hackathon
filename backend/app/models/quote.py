@@ -92,14 +92,6 @@ class Quote(db.Model):
         foreign_keys=[created_by_user_id],
     )
 
-    summary = db.relationship(
-        "Summary",
-        back_populates="quote",
-        uselist=False,
-        cascade="all, delete-orphan",
-        passive_deletes=True,
-    )
-
     # ======================================
     # Serialization
     # ======================================
@@ -146,23 +138,6 @@ class Quote(db.Model):
             "status": self.status,
 
             "line_items": self.line_items,
-
-            "summary": (
-                {
-                    "summary_id": self.summary.summary_id,
-                    "client_id": self.summary.client_id,
-                    "proposal_id": self.summary.proposal_id,
-                    "quote_id": self.summary.quote_id,
-                    "first_meeting_deliverables": self.summary.first_meeting_deliverables,
-                    "created_at": (
-                        self.summary.created_at.isoformat()
-                        if self.summary.created_at
-                        else None
-                    ),
-                }
-                if self.summary
-                else None
-            ),
 
             "created_at": (
                 self.created_at.isoformat()
