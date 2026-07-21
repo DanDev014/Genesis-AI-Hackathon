@@ -234,7 +234,7 @@ def preview_quote():
 def page_proposals(request: Request):
     ctx = {"request": request, "brand": brand_mod.load(),
            "proposals": store.list_proposals()}
-    return _pages.TemplateResponse("pages/proposals_list.html", ctx)
+    return _pages.TemplateResponse(request, "pages/proposals_list.html", ctx)
 
 
 @app.get("/quotes", response_class=HTMLResponse)
@@ -243,7 +243,7 @@ def page_quotes(request: Request):
            "quotes": store.list_quotes(),
            "qb_mode": quickbooks.mode(),
            "qb_configured": quickbooks.is_configured()}
-    return _pages.TemplateResponse("pages/quotes_list.html", ctx)
+    return _pages.TemplateResponse(request, "pages/quotes_list.html", ctx)
 
 
 @app.get("/proposals/{doc_id}", response_class=HTMLResponse)
@@ -296,7 +296,7 @@ def quickbooks_preview(request: Request, doc_id: str):
     ctx = {"request": request, "brand": brand_mod.load(),
            "quote": doc, "result": result,
            "payload_json": _json.dumps(result.get("payload", {}), indent=2)}
-    return _pages.TemplateResponse("pages/quickbooks_preview.html", ctx)
+    return _pages.TemplateResponse(request, "pages/quickbooks_preview.html", ctx)
 
 
 @app.get("/quickbooks/status")
@@ -426,11 +426,9 @@ def dashboard_data():
 
 @app.get("/dashboard/view", response_class=HTMLResponse)
 def dashboard_view(request: Request):
-    from fastapi.templating import Jinja2Templates
-    pages = Jinja2Templates(directory="templates")
     data = dashboard_data()
     ctx = {"request": request, "brand": brand_mod.load(),
            "metrics": data["metrics"], "storage": data["storage"],
            "cost": llm_client.cost_report(),
            "db_status": db.status()}
-    return pages.TemplateResponse("pages/dashboard.html", ctx)
+    return _pages.TemplateResponse(request, "pages/dashboard.html", ctx)
