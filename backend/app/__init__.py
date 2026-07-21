@@ -12,6 +12,8 @@ from .routes.transcripts import transcripts_bp
 from .config import Config
 from .extensions import db, migrate, jwt, cors
 
+from .routes.summaries import summaries_bp
+
 from app.exceptions import AppError
 from app.utils.responses import error_response
 
@@ -51,5 +53,6 @@ def create_app():
     app.register_blueprint(quotes_bp, url_prefix="/api")
     app.register_blueprint(team_members_bp, url_prefix="/api")
     app.register_blueprint(transcripts_bp, url_prefix="/api")
+    app.register_blueprint(summaries_bp,url_prefix="/api")
 
     return app
