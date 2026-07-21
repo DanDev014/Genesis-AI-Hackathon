@@ -2,7 +2,12 @@ from flask import Flask
 from sqlalchemy import text
 from .routes.auth import auth_bp
 from .routes.clients import clients_bp
-from .routes.call_record import call_records_bp
+from .routes.call_records import call_records_bp
+
+from .routes.proposals import proposals_bp
+from .routes.quotes import quotes_bp
+from .routes.team_members import team_members_bp
+from .routes.transcripts import transcripts_bp
 
 from .config import Config
 from .extensions import db, migrate, jwt, cors
