@@ -1,0 +1,106 @@
+{% import "_base.html" as base with context %}
+{{ base.doc_head("Quotes — " ~ brand.company_name) }}
+<style>
+  .list-wrap { max-width: 960px; margin: 0 auto; padding: 20px 24px 60px; }
+  .list-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; }
+  .tabs { display: flex; gap: 4px; margin-bottom: 24px; border-bottom: 1px solid var(--line); }
+  .tabs a { padding: 10px 18px; text-decoration: none; color: var(--muted);
+            font-family: "Space Grotesk", sans-serif; font-weight: 600; font-size: 11pt;
+            border-bottom: 2px solid transparent; margin-bottom: -1px; }
+  .tabs a.active { color: var(--ink); border-bottom-color: var(--primary); }
+  .empty { padding: 40px; text-align: center; color: var(--muted);
+           background: var(--panel); border-radius: 8px; }
+  table.docs { width: 100%; border-collapse: collapse; }
+  table.docs th, table.docs td { text-align: left; padding: 14px 12px;
+    border-bottom: 1px solid var(--line); font-size: 10.5pt; }
+  table.docs th { font-family: "JetBrains Mono", monospace; font-size: 8.5pt;
+    letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+  table.docs a.title { color: var(--ink); font-weight: 600; text-decoration: none; }
+  table.docs a.title:hover { color: var(--primary); }
+  table.docs td.num { text-align: right; font-variant-numeric: tabular-nums; font-weight: 700; }
+  .stamp { display: inline-block; padding: 3px 8px; border-radius: 999px;
+    font-family: "JetBrains Mono", monospace; font-size: 8.5pt;
+    letter-spacing: 0.06em; text-transform: uppercase; }
+  .stamp.draft    { color: #7a5a10; background: #fff2c7; }
+  .stamp.sent     { color: #4335c2; background: #e7e5ff; }
+  .stamp.accepted { color: #0b6b53; background: #ccf1e3; }
+  .stamp.qb       { color: #0a6b3d; background: #d0f0dd; }
+  .qb-banner { background: linear-gradient(90deg, #d0f0dd 0%, #eaf9f0 100%);
+    border: 1px solid #a2d9b6; border-radius: 10px; padding: 12px 16px;
+    display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;
+    font-size: 10.5pt; }
+  .qb-banner .k { font-family: "JetBrains Mono", monospace; font-size: 8.5pt;
+    letter-spacing: 0.06em; text-transform: uppercase; color: #0a6b3d; margin-right: 8px; }
+  .send-btn { background: #2ca01c; color: white; border: none; padding: 6px 12px;
+    font-size: 9.5pt; font-weight: 600; font-family: inherit; border-radius: 6px; cursor: pointer; }
+  .send-btn:hover { background: #248817; }
+  .send-btn:disabled { background: #999; cursor: not-allowed; }
+</style>
+<div class="list-wrap">
+  <div class="list-head">
+    <div style="display: flex; gap: 12px; align-items: center;">
+      {% if brand.logo_data_url %}<img src="{{ brand.logo_data_url }}" style="width: 34px; height: 34px;" />{% endif %}
+      <div>
+        <div style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 13pt; color: var(--ink);">{{ brand.company_name }}</div>
+        <div style="color: var(--muted); font-size: 10pt;">{{ brand.tagline }}</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <a href="/proposals">Proposals</a>
+    <a href="/quotes" class="active">Quotes ({{ quotes|length }})</a>
+    <a href="/captures" style="margin-left: auto; color: var(--muted);">Captures →</a>
+  </div>
+
+  <div class="qb-banner">
+    <div><span class="k">QuickBooks</span>
+      Mode: <strong>{{ qb_mode }}</strong>{% if qb_mode == "sandbox" and not qb_configured %}
+       — env vars missing, calls will fail{% endif %}
+    </div>
+    <div style="color: #0a6b3d; font-size: 9.5pt;">
+      {% if qb_mode == "simulated" %}Estimates are demo-only. Toggle QUICKBOOKS_MODE=sandbox for live sandbox writes.
+      {% else %}Estimates will be created in your QuickBooks sandbox company.{% endif %}
+    </div>
+  </div>
+
+  {% if not quotes %}
+    <div class="empty">
+      <p>No quotes yet.</p>
+      <p style="font-size: 9.5pt;">POST a quote payload to <code>/render/quote.html</code> to create one.</p>
+    </div>
+  {% else %}
+    <table class="docs">
+      <thead>
+        <tr><th>#</th><th>Title</th><th>Client</th><th class="num">Total</th><th>Status</th><th>QuickBooks</th><th></th></tr>
+      </thead>
+      <tbody>
+        {% for q in quotes %}
+        <tr>
+          <td style="font-family: 'JetBrains Mono', monospace; color: var(--muted);">Q-{{ q.number }}</td>
+          <td><a href="/quotes/{{ q.id }}" class="title">{{ q.title or "Untitled" }}</a></td>
+          <td>{{ q.client_company or q.client_name or "—" }}</td>
+          <td class="num">{{ "%.0f"|format(q.total or 0) }} {{ q.currency or "USD" }}</td>
+          <td><span class="stamp {{ q.status }}">{{ q.status }}</span></td>
+          <td>
+            {% if q.quickbooks and q.quickbooks.response and q.quickbooks.response.Estimate %}
+              <span class="stamp qb">QB #{{ q.quickbooks.response.Estimate.Id }}</span>
+            {% else %}
+              <span style="color: var(--muted); font-size: 9.5pt;">—</span>
+            {% endif %}
+          </td>
+          <td>
+            <form method="POST" action="/quotes/{{ q.id }}/send-to-quickbooks" style="margin:0">
+              <button type="submit" class="send-btn"
+                {% if q.quickbooks and q.quickbooks.ok %}disabled title="Already sent"{% endif %}>
+                {% if q.quickbooks and q.quickbooks.ok %}Sent ✓{% else %}Send to QB{% endif %}
+              </button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% endif %}
+</div>
+</body></html>

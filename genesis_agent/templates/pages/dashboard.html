@@ -1,0 +1,135 @@
+{% import "_base.html" as base with context %}
+{{ base.doc_head("Dashboard — " ~ brand.company_name) }}
+<style>
+  .dash-wrap { max-width: 1080px; margin: 0 auto; padding: 20px 24px 60px; }
+  .dash-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+  .tabs { display: flex; gap: 4px; margin-bottom: 24px; border-bottom: 1px solid var(--line); }
+  .tabs a { padding: 10px 18px; text-decoration: none; color: var(--muted);
+            font-family: "Space Grotesk", sans-serif; font-weight: 600; font-size: 11pt;
+            border-bottom: 2px solid transparent; margin-bottom: -1px; }
+  .tabs a.active { color: var(--ink); border-bottom-color: var(--primary); }
+  .metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 22px; }
+  @media (max-width: 820px) { .metrics { grid-template-columns: repeat(2, 1fr); } }
+  .metric { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 18px 20px; }
+  .metric .lbl { font-family: "JetBrains Mono", monospace; font-size: 9pt;
+                 letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+  .metric .val { font-family: "Space Grotesk", sans-serif; font-size: 26pt;
+                 font-weight: 700; letter-spacing: -0.02em; margin-top: 6px; color: var(--ink); }
+  .metric .val.money { color: var(--accent); }
+  .metric .val.primary { color: var(--primary); }
+  .metric .sub { font-size: 9.5pt; color: var(--muted); margin-top: 4px; }
+
+  .panel { background: white; border: 1px solid var(--line); border-radius: 10px;
+           padding: 20px 22px; margin-bottom: 18px; }
+  .panel h3 { margin: 0 0 12px; font-family: "Space Grotesk", sans-serif; font-size: 12pt; }
+
+  .cost-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 12px; }
+  .cost-item { background: var(--panel); border-radius: 8px; padding: 12px 14px; }
+  .cost-item .k { font-family: "JetBrains Mono", monospace; font-size: 8.5pt;
+                  letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+  .cost-item .v { font-family: "Space Grotesk", sans-serif; font-size: 16pt;
+                  font-weight: 700; margin-top: 4px; color: var(--ink); }
+  .cost-item .sub { font-size: 9pt; color: var(--muted); margin-top: 2px; }
+  .cost-item.free .v { color: var(--accent); }
+
+  .storage-badge { font-family: "JetBrains Mono", monospace; font-size: 9pt;
+                   color: var(--muted); }
+  .storage-badge.db { color: #0a6b3d; }
+  .storage-badge.files { color: #7a5a10; }
+</style>
+<div class="dash-wrap">
+  <div class="dash-head">
+    <div style="display: flex; gap: 12px; align-items: center;">
+      {% if brand.logo_data_url %}<img src="{{ brand.logo_data_url }}" style="width: 34px; height: 34px;" />{% endif %}
+      <div>
+        <div style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 13pt; color: var(--ink);">{{ brand.company_name }}</div>
+        <div style="color: var(--muted); font-size: 10pt;">{{ brand.tagline }}</div>
+      </div>
+    </div>
+    <div class="storage-badge {{ storage }}">
+      {% if storage == "db" %}● Neon Postgres{% else %}● File store fallback{% endif %}
+    </div>
+  </div>
+
+  <div class="tabs">
+    <a href="/dashboard/view" class="active">Dashboard</a>
+    <a href="/proposals">Proposals</a>
+    <a href="/quotes">Quotes</a>
+    <a href="/captures" style="margin-left: auto; color: var(--muted);">Captures →</a>
+  </div>
+
+  <div class="metrics">
+    <div class="metric">
+      <div class="lbl">Proposals this month</div>
+      <div class="val">{{ metrics.proposals_this_month }}</div>
+    </div>
+    <div class="metric">
+      <div class="lbl">Proposals sent</div>
+      <div class="val primary">{{ metrics.proposals_sent }}</div>
+    </div>
+    <div class="metric">
+      <div class="lbl">Quoted total</div>
+      <div class="val money">{{ "%.0f"|format(metrics.quoted_total) }}</div>
+      <div class="sub">across {{ metrics.quotes_count }} quotes (KES)</div>
+    </div>
+    <div class="metric">
+      <div class="lbl">Won</div>
+      <div class="val money">{{ "%.0f"|format(metrics.won_total) }}</div>
+      <div class="sub">{{ metrics.won_count }} deals · {{ "%.0f"|format(metrics.win_rate) }}% win rate</div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h3>Token efficiency</h3>
+    <p style="color: var(--muted); font-size: 10.5pt; margin-top: 0;">
+      Live meter across every Claude call in Kora. Cache hits and deterministic paths
+      are free — the model tier column shows why cost stays low.
+    </p>
+    <div class="cost-grid">
+      <div class="cost-item free">
+        <div class="k">Cache hit rate</div>
+        <div class="v">{{ "%.0f"|format(cost.cache_hit_rate * 100) }}%</div>
+        <div class="sub">{{ cost.cache_hits }} of {{ cost.cache_hits + cost.total_calls }} requests</div>
+      </div>
+      <div class="cost-item">
+        <div class="k">Haiku input tokens</div>
+        <div class="v">{{ cost.input_tokens_fast }}</div>
+        <div class="sub">cheap tier · {{ cost.model_fast }}</div>
+      </div>
+      <div class="cost-item">
+        <div class="k">Sonnet input tokens</div>
+        <div class="v">{{ cost.input_tokens_smart }}</div>
+        <div class="sub">used only when reasoning is needed</div>
+      </div>
+      <div class="cost-item">
+        <div class="k">Total USD (est.)</div>
+        <div class="v">${{ "%.4f"|format(cost.usd_estimate) }}</div>
+        <div class="sub">since last reset · at Anthropic list prices</div>
+      </div>
+      <div class="cost-item">
+        <div class="k">LLM mode</div>
+        <div class="v" style="font-size: 12pt;">{{ cost.mode }}</div>
+        <div class="sub">{% if cost.mode == "mock" %}no key set{% else %}live claude{% endif %}</div>
+      </div>
+      <div class="cost-item">
+        <div class="k">Cache size</div>
+        <div class="v">{{ cost.cache_size }}</div>
+        <div class="sub">unique prompts stored</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h3>Storage</h3>
+    <p style="color: var(--muted); font-size: 10.5pt; margin: 0;">
+      {% if db_status.available %}
+      Connected to Neon Postgres at <code style="font-family:'JetBrains Mono', monospace;">{{ db_status.url_redacted }}</code>.
+      All proposals, quotes, briefs, and approvals persist there.
+      {% else %}
+      Using local file storage.
+      {% if db_status.configured %}DB configured but unreachable — <code>{{ db_status.last_error }}</code>{% else %}Set <code>DATABASE_URL</code> in .env to enable Neon.{% endif %}
+      {% endif %}
+    </p>
+  </div>
+</div>
+</body></html>

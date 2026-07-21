@@ -1,0 +1,73 @@
+{% import "_base.html" as base with context %}
+{{ base.doc_head("Proposals — " ~ brand.company_name) }}
+<style>
+  .list-wrap { max-width: 960px; margin: 0 auto; padding: 20px 24px 60px; }
+  .list-head { display: flex; justify-content: space-between; align-items: center;
+               margin-bottom: 18px; }
+  .tabs { display: flex; gap: 4px; margin-bottom: 24px; border-bottom: 1px solid var(--line); }
+  .tabs a { padding: 10px 18px; text-decoration: none; color: var(--muted);
+            font-family: "Space Grotesk", sans-serif; font-weight: 600; font-size: 11pt;
+            border-bottom: 2px solid transparent; margin-bottom: -1px; }
+  .tabs a.active { color: var(--ink); border-bottom-color: var(--primary); }
+  .empty { padding: 40px; text-align: center; color: var(--muted);
+           background: var(--panel); border-radius: 8px; }
+  table.docs { width: 100%; border-collapse: collapse; }
+  table.docs th, table.docs td { text-align: left; padding: 14px 12px;
+    border-bottom: 1px solid var(--line); font-size: 10.5pt; }
+  table.docs th { font-family: "JetBrains Mono", monospace; font-size: 8.5pt;
+    letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+  table.docs a.title { color: var(--ink); font-weight: 600; text-decoration: none; }
+  table.docs a.title:hover { color: var(--primary); }
+  table.docs .sub { color: var(--muted); font-size: 9.5pt; margin-top: 2px; }
+  .stamp { display: inline-block; padding: 3px 8px; border-radius: 999px;
+    font-family: "JetBrains Mono", monospace; font-size: 8.5pt;
+    letter-spacing: 0.06em; text-transform: uppercase; }
+  .stamp.draft    { color: #7a5a10; background: #fff2c7; }
+  .stamp.sent     { color: #4335c2; background: #e7e5ff; }
+  .stamp.accepted { color: #0b6b53; background: #ccf1e3; }
+</style>
+<div class="list-wrap">
+  <div class="list-head">
+    <div style="display: flex; gap: 12px; align-items: center;">
+      {% if brand.logo_data_url %}<img src="{{ brand.logo_data_url }}" style="width: 34px; height: 34px;" />{% endif %}
+      <div>
+        <div style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 13pt; color: var(--ink);">{{ brand.company_name }}</div>
+        <div style="color: var(--muted); font-size: 10pt;">{{ brand.tagline }}</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <a href="/proposals" class="active">Proposals ({{ proposals|length }})</a>
+    <a href="/quotes">Quotes</a>
+    <a href="/captures" style="margin-left: auto; color: var(--muted);">Captures →</a>
+  </div>
+
+  {% if not proposals %}
+    <div class="empty">
+      <p>No proposals yet.</p>
+      <p style="font-size: 9.5pt;">POST a proposal payload to <code>/render/proposal.html</code> to create one.</p>
+    </div>
+  {% else %}
+    <table class="docs">
+      <thead>
+        <tr><th>#</th><th>Title</th><th>Client</th><th>Status</th><th>Created</th></tr>
+      </thead>
+      <tbody>
+        {% for p in proposals %}
+        <tr>
+          <td style="font-family: 'JetBrains Mono', monospace; color: var(--muted);">P-{{ p.number }}</td>
+          <td>
+            <a href="/proposals/{{ p.id }}" class="title">{{ p.title or "Untitled" }}</a>
+            {% if p.summary %}<div class="sub">{{ p.summary[:90] }}{% if p.summary|length > 90 %}…{% endif %}</div>{% endif %}
+          </td>
+          <td>{{ p.client_company or p.client_name or "—" }}</td>
+          <td><span class="stamp {{ p.status }}">{{ p.status }}</span></td>
+          <td style="color: var(--muted); font-family: 'JetBrains Mono', monospace; font-size: 9.5pt;">{{ p.created_at[:10] }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% endif %}
+</div>
+</body></html>
