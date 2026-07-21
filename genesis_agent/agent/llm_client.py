@@ -1,17 +1,21 @@
 """
 Shared LLM client with token-cost discipline built in.
 
-Every Claude call in Kora goes through here. That gives us four things
+Every generative call in Kora goes through here. That gives us four things
 we can point at when judges ask about cost:
 
-1. Model tiering. Haiku by default, Sonnet only when explicitly requested.
+1. Model tiering. Gemini Flash by default, Gemini Pro only when explicitly
+   requested.
 2. Response caching by SHA-256 of (system + user + tier). Zero tokens on
    identical inputs. Demo replays cost once, then zero.
 3. Live cost meter — input/output/cached/total tokens, exposed at /tokens.
 4. Mock fallback. No API key? No call. Deterministic output, zero tokens.
 
+Backed by the Gemini API (free tier) rather than Anthropic — same public
+interface as before, so nothing else in Kora needs to change.
+
 Kept small on purpose. This is the one file to change if you want to
-retune the cost/quality trade-off.
+retune the cost/quality trade-off or swap providers again.
 """
 from __future__ import annotations
 
@@ -22,15 +26,16 @@ import re
 import time
 from typing import Optional
 
-API_KEY = os.getenv("ANTHROPIC_API_KEY")
-MODEL_SMART = os.getenv("LLM_SMART", "claude-sonnet-4-5")
-MODEL_FAST = os.getenv("LLM_FAST", "claude-haiku-4-5")
+API_KEY = os.getenv("GEMINI_API_KEY")
+MODEL_SMART = os.getenv("LLM_SMART", "gemini-1.5-pro")
+MODEL_FAST = os.getenv("LLM_FAST", "gemini-1.5-flash")
 
 # Rough public per-million-token prices in USD. Used only for the meter,
-# not for anything customer-facing. Override with env vars if Anthropic
-# changes prices; the numbers below are the ones judges will roughly see.
-PRICE_IN = {"smart": 3.00, "fast": 0.80}
-PRICE_OUT = {"smart": 15.00, "fast": 4.00}
+# not for anything customer-facing. Gemini's free tier is $0 up to its rate
+# limits — we report that honestly rather than pricing it like a paid API.
+# Override with env vars if you move to Gemini's paid tier.
+PRICE_IN = {"smart": 0.0, "fast": 0.0}
+PRICE_OUT = {"smart": 0.0, "fast": 0.0}
 
 _cache: dict = {}          # sha256 -> raw text
 _meter = {
@@ -74,6 +79,7 @@ def cost_report() -> dict:
     """Public snapshot for the /tokens endpoint."""
     return {
         "mode": mode(),
+        "provider": "gemini",
         "model_smart": MODEL_SMART,
         "model_fast": MODEL_FAST,
         "total_calls": _meter["calls"],
@@ -99,7 +105,7 @@ def reset_meter() -> None:
 # ---------- calls ----------
 def call_text(system: str, user: str, tier: str = "fast",
               max_tokens: Optional[int] = None) -> Optional[str]:
-    """Return the model text, or None if no key. Cache-first. Haiku-by-default."""
+    """Return the model text, or None if no key. Cache-first. Flash-by-default."""
     if not API_KEY:
         return None
 
@@ -114,24 +120,37 @@ def call_text(system: str, user: str, tier: str = "fast",
         est_input = max(1, (len(system) + len(user)) // 4)
         max_tokens = max(200, min(1200, int(est_input * 0.4)))
 
-    import anthropic  # imported lazily so mock mode is dep-free
-    client = anthropic.Anthropic(api_key=API_KEY)
-    model = _model_for(tier)
+    import google.generativeai as genai  # imported lazily so mock mode is dep-free
+    genai.configure(api_key=API_KEY)
+    model_name = _model_for(tier)
     try:
-        msg = client.messages.create(
-            model=model, max_tokens=max_tokens, system=system,
-            messages=[{"role": "user", "content": user}],
+        model = genai.GenerativeModel(
+            model_name=model_name,
+            system_instruction=system,
+        )
+        resp = model.generate_content(
+            user,
+            generation_config=genai.types.GenerationConfig(
+                max_output_tokens=max_tokens,
+            ),
         )
     except Exception as exc:
-        print(f"[llm_client] {model} failed: {exc}")
+        print(f"[llm_client] {model_name} failed: {exc}")
         return None
 
-    text = "".join(b.text for b in msg.content if getattr(b, "type", "") == "text")
+    text = (resp.text or "").strip() if hasattr(resp, "text") else ""
+    if not text:
+        print(f"[llm_client] {model_name} returned no text (possibly blocked/empty).")
+        return None
+
     _cache[k] = text
-    # Record actual usage from the response.
+    # Record actual usage from the response. Gemini's field names differ from
+    # Anthropic's — prompt_token_count / candidates_token_count instead of
+    # input_tokens / output_tokens — but we normalise into the same meter.
     try:
-        in_tok = getattr(msg.usage, "input_tokens", 0) or 0
-        out_tok = getattr(msg.usage, "output_tokens", 0) or 0
+        usage = getattr(resp, "usage_metadata", None)
+        in_tok = getattr(usage, "prompt_token_count", 0) or 0
+        out_tok = getattr(usage, "candidates_token_count", 0) or 0
     except Exception:
         in_tok = out_tok = 0
     _record(tier, in_tok, out_tok)
