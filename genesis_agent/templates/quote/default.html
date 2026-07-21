@@ -1,0 +1,64 @@
+{% import "_base.html" as base with context %}
+{{ base.doc_head("Quotation — " ~ (quote.title or "Untitled")) }}
+{{ base.header("Quotation", "Q-" ~ quote.number, quote.date, quote.valid_until) }}
+
+<section class="cover">
+  <div class="eyebrow">Prepared for</div>
+  <div class="to">{{ quote.client_company or quote.client_name or "The client" }}
+  {% if quote.client_name and quote.client_company %} · Attn: {{ quote.client_name }}{% endif %}</div>
+  <h1 class="title">{{ quote.title }}</h1>
+  {% if quote.status %}<div style="margin-top:14px"><span class="stamp {{ quote.status }}">{{ quote.status }}</span></div>{% endif %}
+</section>
+
+<section>
+  <h3>Line items</h3>
+  <table class="items">
+    <thead>
+      <tr><th>Item</th><th>Description</th><th class="num">Qty</th><th class="num">Unit price</th><th class="num">Amount</th></tr>
+    </thead>
+    <tbody>
+      {% for it in quote.line_items %}
+      <tr>
+        <td><strong>{{ it.item }}</strong></td>
+        <td style="color:var(--muted)">{{ it.description or "" }}</td>
+        <td class="num">{{ it.qty }}</td>
+        <td class="num">{{ "%.0f"|format(it.unit_price) }} {{ quote.currency }}</td>
+        <td class="num"><strong>{{ "%.0f"|format(it.amount) }} {{ quote.currency }}</strong></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <div class="totals">
+    {% if quote.subtotal is defined and quote.subtotal != quote.total %}
+      <div><span class="k">Subtotal:</span> <span class="v">{{ "%.0f"|format(quote.subtotal) }} {{ quote.currency }}</span></div>
+    {% endif %}
+    {% if quote.tax %}
+      <div><span class="k">Tax ({{ quote.tax_rate }}%):</span> <span class="v">{{ "%.0f"|format(quote.tax) }} {{ quote.currency }}</span></div>
+    {% endif %}
+    <div><span class="k">Total:</span> <span class="v grand">{{ "%.0f"|format(quote.total) }} {{ quote.currency }}</span></div>
+  </div>
+</section>
+
+<section class="panel">
+  <h3>Terms</h3>
+  <p style="margin:0">{{ brand.quote_terms }}</p>
+  <p style="margin-top:6px; color:var(--muted); font-size:10pt">
+    Valid for {{ brand.quote_valid_days }} days from the issue date.
+  </p>
+</section>
+
+<div class="signature">
+  <div>
+    <div class="line"></div>
+    <div><strong>{{ brand.signature_name }}</strong></div>
+    <div style="color:var(--muted); font-size:10pt">{{ brand.signature_role }} · {{ brand.company_name }}</div>
+  </div>
+  <div>
+    <div class="line"></div>
+    <div><strong>{{ quote.client_name or "Client signatory" }}</strong></div>
+    <div style="color:var(--muted); font-size:10pt">{{ quote.client_company or "" }}</div>
+  </div>
+</div>
+
+{{ base.footer() }}

@@ -1,0 +1,109 @@
+{% import "_base.html" as base with context %}
+{{ base.doc_head("Sent to QuickBooks — " ~ (quote.title or "Untitled")) }}
+<style>
+  /* Mimic QuickBooks Online chrome so the "look it landed in QB" beat feels real. */
+  .qb-page { max-width: 900px; margin: 0 auto; padding: 20px 24px 60px; font-family: "Inter", Arial, sans-serif; }
+  .qb-nav { background: #2ca01c; color: white; padding: 12px 20px; border-radius: 8px 8px 0 0;
+    display: flex; justify-content: space-between; align-items: center; }
+  .qb-nav .brand { font-weight: 700; font-size: 12pt; letter-spacing: -0.01em; }
+  .qb-nav .env { font-family: "JetBrains Mono", monospace; font-size: 8.5pt;
+    background: rgba(255,255,255,0.2); padding: 4px 10px; border-radius: 999px;
+    letter-spacing: 0.06em; text-transform: uppercase; }
+  .qb-body { background: white; border: 1px solid #d0d5dd; border-top: none;
+    border-radius: 0 0 8px 8px; padding: 26px 28px; }
+  .qb-body h1 { font-size: 20pt; margin: 0 0 4px; color: #0a0a0a; }
+  .qb-body .sub { color: #667; font-size: 10.5pt; margin-bottom: 22px; }
+  .kv { display: grid; grid-template-columns: 160px 1fr; gap: 8px 20px;
+    font-size: 10.5pt; margin-bottom: 20px; }
+  .kv .k { color: #667; }
+  .kv .v { color: #111; font-weight: 500; }
+  table.lines { width: 100%; border-collapse: collapse; margin-top: 8px; }
+  table.lines th, table.lines td { text-align: left; padding: 10px 12px;
+    border-bottom: 1px solid #e6e8ec; font-size: 10.5pt; }
+  table.lines th { background: #f7f8fa; color: #667; font-weight: 600; font-size: 9.5pt; }
+  table.lines td.num, table.lines th.num { text-align: right;
+    font-variant-numeric: tabular-nums; }
+  .totals { display: flex; justify-content: flex-end; gap: 24px; margin-top: 14px; }
+  .totals .k { color: #667; font-size: 10.5pt; }
+  .totals .v { color: #0a0a0a; font-weight: 700; font-size: 14pt; }
+  .banner { padding: 12px 16px; border-radius: 8px; margin-bottom: 20px;
+    font-size: 10.5pt; display: flex; align-items: center; gap: 12px; }
+  .banner.ok { background: #e8f7ed; color: #0a6b3d; border: 1px solid #a2d9b6; }
+  .banner.err { background: #fde8e8; color: #7a1010; border: 1px solid #f0b6b6; }
+  .banner .k { font-family: "JetBrains Mono", monospace; font-size: 8.5pt;
+    letter-spacing: 0.06em; text-transform: uppercase; }
+  .back { display: inline-block; margin-top: 20px; color: #2ca01c;
+    text-decoration: none; font-weight: 600; font-size: 10.5pt; }
+  .back:hover { text-decoration: underline; }
+  details { margin-top: 16px; background: #f7f8fa; border-radius: 6px; padding: 10px 14px; }
+  details summary { cursor: pointer; font-size: 9.5pt; color: #667; }
+  pre { font-family: "JetBrains Mono", monospace; font-size: 8.5pt; overflow-x: auto;
+    margin: 8px 0 0; color: #333; }
+</style>
+<div class="qb-page">
+  <div class="qb-nav">
+    <div class="brand">QuickBooks Online</div>
+    <div class="env">{{ result.mode }}</div>
+  </div>
+  <div class="qb-body">
+    {% if result.ok %}
+      <div class="banner ok">
+        <span class="k">Estimate created</span>
+        <span>{% if result.mode == "simulated" %}Simulated. The payload below is exactly what would be sent to QuickBooks in sandbox/production mode.
+              {% else %}Estimate #{{ result.response.Estimate.Id }} created in your QuickBooks sandbox company.{% endif %}</span>
+      </div>
+    {% else %}
+      <div class="banner err">
+        <span class="k">Failed</span>
+        <span>{{ result.error }}</span>
+      </div>
+    {% endif %}
+
+    <h1>Estimate #{{ quote.number }}</h1>
+    <div class="sub">{{ quote.title }}</div>
+
+    <div class="kv">
+      <div class="k">Customer</div>
+      <div class="v">{{ quote.client_company or quote.client_name or "—" }}</div>
+      <div class="k">Date</div>
+      <div class="v">{{ result.payload.TxnDate }}</div>
+      <div class="k">Expiration</div>
+      <div class="v">{{ result.payload.ExpirationDate }}</div>
+      <div class="k">Currency</div>
+      <div class="v">{{ result.payload.CurrencyRef.value }}</div>
+      {% if result.response and result.response.Estimate %}
+      <div class="k">QuickBooks ID</div>
+      <div class="v" style="font-family: 'JetBrains Mono', monospace;">{{ result.response.Estimate.Id }}</div>
+      {% endif %}
+    </div>
+
+    <table class="lines">
+      <thead>
+        <tr><th>Product/Service</th><th>Description</th><th class="num">Qty</th><th class="num">Rate</th><th class="num">Amount</th></tr>
+      </thead>
+      <tbody>
+        {% for line in result.payload.Line %}
+        <tr>
+          <td>{{ line.SalesItemLineDetail.ItemRef.name }}</td>
+          <td style="color:#667">{{ line.Description }}</td>
+          <td class="num">{{ line.SalesItemLineDetail.Qty }}</td>
+          <td class="num">{{ "%.2f"|format(line.SalesItemLineDetail.UnitPrice) }}</td>
+          <td class="num"><strong>{{ "%.2f"|format(line.Amount) }}</strong></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <div class="totals">
+      <div class="k">Total</div>
+      <div class="v">{{ "%.2f"|format(result.payload.TotalAmt) }} {{ result.payload.CurrencyRef.value }}</div>
+    </div>
+
+    <details>
+      <summary>View raw payload (this is what got POSTed to QuickBooks)</summary>
+      <pre>{{ payload_json }}</pre>
+    </details>
+
+    <a class="back" href="/quotes">← Back to quotes</a>
+  </div>
+</div>
+</body></html>

@@ -1,0 +1,65 @@
+{% import "_base.html" as base with context %}
+{{ base.doc_head("Proposal — " ~ (proposal.title or "Untitled")) }}
+{{ base.header("Proposal", "P-" ~ proposal.number, proposal.date) }}
+
+<section class="cover">
+  <div class="eyebrow">Prepared for</div>
+  <div class="to">{{ proposal.client_company or proposal.client_name or "The client" }}
+  {% if proposal.client_name and proposal.client_company %} · Attn: {{ proposal.client_name }}{% endif %}</div>
+  <h1 class="title">{{ proposal.title }}</h1>
+  {% if proposal.summary %}<p class="sub">{{ proposal.summary }}</p>{% endif %}
+  {% if proposal.status %}<div style="margin-top:14px"><span class="stamp {{ proposal.status }}">{{ proposal.status }}</span></div>{% endif %}
+</section>
+
+{% if proposal.objectives %}
+<section>
+  <h2>What you're trying to achieve</h2>
+  <ul>{% for o in proposal.objectives %}<li>{{ o }}</li>{% endfor %}</ul>
+</section>
+{% endif %}
+
+<section>
+  <h2>Recommended approach</h2>
+  <p>{{ proposal.approach or "A focused engagement that moves quickly from strategy to production, with tight review loops so " ~ (proposal.client_company or "your team") ~ " stays in control at every step." }}</p>
+</section>
+
+{% if proposal.scope_items %}
+<section>
+  <h2>Scope of work</h2>
+  <ul>{% for s in proposal.scope_items %}<li>{{ s }}</li>{% endfor %}</ul>
+</section>
+{% endif %}
+
+{% if proposal.deliverables %}
+<section>
+  <h2>Deliverables</h2>
+  <ul>{% for d in proposal.deliverables %}<li>{{ d }}</li>{% endfor %}</ul>
+</section>
+{% endif %}
+
+{% if proposal.timeline %}
+<section>
+  <h2>Timeline</h2>
+  <p>{{ proposal.timeline }}</p>
+</section>
+{% endif %}
+
+<section>
+  <h2>Next steps</h2>
+  <p>Approve this proposal and the attached quotation and we'll schedule a kickoff within three business days.</p>
+</section>
+
+<div class="signature">
+  <div>
+    <div class="line"></div>
+    <div><strong>{{ brand.signature_name }}</strong></div>
+    <div style="color:var(--muted); font-size:10pt">{{ brand.signature_role }} · {{ brand.company_name }}</div>
+  </div>
+  <div>
+    <div class="line"></div>
+    <div><strong>{{ proposal.client_name or "Client signatory" }}</strong></div>
+    <div style="color:var(--muted); font-size:10pt">{{ proposal.client_company or "" }}</div>
+  </div>
+</div>
+
+{{ base.footer() }}

@@ -1,0 +1,19 @@
+fastapi>=0.110
+uvicorn[standard]>=0.29
+python-dotenv>=1.0
+pyyaml>=6.0
+jinja2>=3.1
+
+# QuickBooks sandbox mode
+requests>=2.31
+
+# Neon / Postgres. Loaded lazily — if DATABASE_URL is unset, these are unused.
+psycopg[binary]>=3.1
+psycopg-pool>=3.2
+
+# Anthropic Claude — used by the brief generator only. Kora falls back to a
+# deterministic template if this or ANTHROPIC_API_KEY is missing.
+anthropic>=0.40
+
+# Optional PDF rendering. Skip on Windows if it doesn't install cleanly.
+# weasyprint>=61.2
