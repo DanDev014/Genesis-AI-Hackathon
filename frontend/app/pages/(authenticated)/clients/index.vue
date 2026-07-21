@@ -108,7 +108,6 @@ const debouncedSearch = ref("");
 const status = ref("All statuses");
 const page = ref(1);
 const limit = ref(20);
-
 const statuses = [
   "All statuses",
   "Active",

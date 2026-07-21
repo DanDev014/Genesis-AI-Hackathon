@@ -125,12 +125,22 @@
       </aside>
     </div>
   </main>
+  <SummaryPreviewModal
+    v-model="summaryModalOpen"
+    :summary="generatedSummary"
+    @close="summaryModalOpen = false"
+    @download="downloadSummary"
+    @view="viewSummary"
+  />
 </template>
 
 <script setup lang="ts">
 import * as v from "valibot";
 
 const loading = ref(false);
+
+const summaryModalOpen = ref(false);
+const generatedSummary = ref(null);
 
 const meetingTypes = [
   {
@@ -183,10 +193,20 @@ async function onSubmit(event: { data: Schema }) {
     });
 
     console.log(response);
+    generatedSummary.value = response.summary.capture;
+    summaryModalOpen.value = true;
   } catch (error) {
     console.error("Error processing transcript", error);
   } finally {
     loading.value = false;
   }
 }
+
+const downloadSummary = async () => {
+  console.log("Download Summary", generatedSummary.value);
+};
+
+const viewSummary = async () => {
+  console.log("View Summary", generatedSummary.value);
+};
 </script>

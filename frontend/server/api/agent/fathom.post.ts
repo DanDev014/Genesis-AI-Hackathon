@@ -1,28 +1,78 @@
 export default defineEventHandler(async (event) => {
-  const body = await readBody(event);
+  const body = await readBody<{
+    transcript: string;
+    meetingType: string;
+    clientId: number;
+  }>(event);
 
-  console.log("Incoming request:", body);
+  try {
+    console.log("Incoming request:", body);
 
-  const scriptResponse = await agentRequest("/webhook/fathom/script", {
-    method: "POST",
-    body: body.transcript,
-    headers: {
-      "Content-Type": "text/plain",
-      Accept: "application/json",
-    },
-  });
+    /**
+     * Step 1:
+     * Convert the raw transcript into structured JSON.
+     */
+    const scriptResponse = await agentRequest<{
+      ok: boolean;
+      captured: Record<string, unknown>;
+    }>("/webhook/fathom/script", {
+      method: "POST",
+      body: body.transcript,
+      headers: {
+        "Content-Type": "text/plain",
+        Accept: "application/json",
+      },
+    });
 
-  console.log("Script response:", scriptResponse);
+    console.log("Script response:", scriptResponse);
 
-  const fathomResponse = await agentRequest("/webhook/fathom", {
-    method: "POST",
-    body: scriptResponse,
-    headers: {
-      Accept: "application/json",
-    },
-  });
+    /**
+     * Step 2:
+     * Send the structured JSON to the AI workflow.
+     * This generates the final meeting summary that will be stored.
+     */
+    const summaryResponse = await agentRequest("/webhook/fathom", {
+      method: "POST",
+      body: scriptResponse,
+      headers: {
+        Accept: "application/json",
+      },
+    });
 
-  console.log("Fathom response:", fathomResponse);
+    console.log("Summary response:", summaryResponse);
 
-  return fathomResponse;
+    /**
+     * ==========================================================
+     * TODO:
+     * Once the Flask endpoint is available, persist the summary.
+     * ==========================================================
+     */
+
+    // const savedSummary = await apiRequest("/summaries", {
+    //   method: "POST",
+    //   body: {
+    //     client_id: body.clientId,
+    //     first_meeting_deliverables: summaryResponse.captured,
+    //   },
+    // });
+
+    // return savedSummary;
+
+    /**
+     * Temporary response while the persistence endpoint
+     * is still under development.
+     */
+    return {
+      success: true,
+      clientId: body.clientId,
+      summary: summaryResponse,
+    };
+  } catch (error) {
+    console.error("Generate summary error:", error);
+
+    throw createError({
+      statusCode: 500,
+      statusMessage: "Failed to generate meeting summary.",
+    });
+  }
 });
