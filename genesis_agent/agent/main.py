@@ -386,7 +386,6 @@ def approve_proposal(proposal_id: str):
     if not p:
         raise HTTPException(404, "Proposal not found.")
     db.log_activity(int(proposal_id), "approved", notes="Producer approved")
-    db.update_proposal(proposal_id, {"status": "internal_review"})
     return {"ok": True, "proposal_id": proposal_id,
             "message": "Approved. Send-to-QuickBooks is now unlocked."}
 

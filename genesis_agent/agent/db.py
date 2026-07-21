@@ -171,8 +171,8 @@ def _client_id_for(company: str, name: str, email: str = "") -> Optional[int]:
     synth_email = email or f"{_slug(company or name)}@unknown.local"
     row = _exec(
         """
-        insert into clients (name, company, industry, email, source, status, created_at)
-        values (%s, %s, %s, %s, %s, %s, %s)
+        insert into clients (client_id, name, company, industry, email, source, status, created_at)
+        values ((select coalesce(max(client_id), 0) + 1 from clients), %s, %s, %s, %s, %s, %s, %s)
         on conflict (email) do update set company = excluded.company
         returning client_id
         """,
@@ -211,9 +211,11 @@ def save_proposal(data: dict) -> dict:
     row = _exec(
         """
         insert into proposals
-          (client_id, scope_of_work, deliverables_list, timeline_milestones,
+          (proposal_id, client_id, scope_of_work, deliverables_list, timeline_milestones,
            version, status, generated_by, created_at)
-        values (%s, %s, %s::jsonb, %s::jsonb, %s, %s, %s, %s)
+        values (
+          (select coalesce(max(proposal_id), 0) + 1 from proposals),
+          %s, %s, %s::jsonb, %s::jsonb, %s, %s, %s, %s)
         returning proposal_id, created_at
         """,
         (
@@ -289,11 +291,16 @@ def _status_to_action(status: str) -> str:
 # --------------------------------------------------------------------------
 def log_activity(proposal_id: int, action: str, notes: str = "",
                  actor_user_id: Optional[int] = None) -> None:
-    """Append to proposal_activity_log. Actions must match the check constraint."""
+    """Append to proposal_activity_log. Actions must match the check constraint.
+
+    activity_id has no default/identity/sequence in Genesis's schema, so we
+    assign the next id ourselves rather than altering their table."""
     _exec("""
         insert into proposal_activity_log
-          (proposal_id, actor_user_id, action, notes, created_at)
-        values (%s, %s, %s, %s, %s)
+          (activity_id, proposal_id, actor_user_id, action, notes, created_at)
+        values (
+          (select coalesce(max(activity_id), 0) + 1 from proposal_activity_log),
+          %s, %s, %s, %s, %s)
     """, (proposal_id, actor_user_id, action, notes[:500],
           datetime.now(timezone.utc)))
 
@@ -345,9 +352,11 @@ def save_quote(data: dict) -> dict:
 
     row = _exec("""
         insert into quotes
-          (proposal_id, currency, tax_rate, discount_amount, total_amount,
+          (quote_id, proposal_id, currency, tax_rate, discount_amount, total_amount,
            validity_days, status, line_items, created_at)
-        values (%s, %s, %s, %s, %s, %s, %s, %s::jsonb, %s)
+        values (
+          (select coalesce(max(quote_id), 0) + 1 from quotes),
+          %s, %s, %s, %s, %s, %s, %s, %s::jsonb, %s)
         returning quote_id, created_at
     """, (
         proposal_id,
