@@ -11,7 +11,6 @@ requests>=2.31
 psycopg[binary]>=3.1
 psycopg-pool>=3.2
 
-
 google-generativeai>=0.8
 
 # Optional PDF rendering. Skip on Windows if it doesn't install cleanly.
