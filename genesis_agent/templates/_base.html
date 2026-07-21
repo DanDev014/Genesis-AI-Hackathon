@@ -1,0 +1,104 @@
+{# Shared brand chrome. Included by proposal.html and quote.html so header,
+   footer, palette and typography stay in lockstep across documents. #}
+
+{% macro doc_head(title) %}
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8" />
+<title>{{ title }} — {{ brand.company_name }}</title>
+<style>
+  :root {
+    --primary: {{ brand.primary_color }};
+    --accent:  {{ brand.accent_color }};
+    --ink:     {{ brand.ink_color }};
+    --text:    {{ brand.text_color }};
+    --muted:   {{ brand.muted_color }};
+    --line:    {{ brand.line_color }};
+    --panel:   {{ brand.panel_color }};
+  }
+  @page { size: A4; margin: 22mm 18mm 26mm 18mm; }
+  * { box-sizing: border-box; }
+  body {
+    font-family: "Inter", "Helvetica Neue", Arial, sans-serif;
+    color: var(--text); font-size: 11pt; line-height: 1.55; margin: 0;
+    -webkit-print-color-adjust: exact; print-color-adjust: exact;
+  }
+  h1, h2, h3 { font-family: "Space Grotesk", "Helvetica Neue", Arial, sans-serif;
+               color: var(--ink); letter-spacing: -0.01em; margin: 0; }
+  h1 { font-size: 26pt; line-height: 1.15; }
+  h2 { font-size: 14pt; margin-top: 22px; margin-bottom: 8px; }
+  h3 { font-size: 11pt; text-transform: uppercase; letter-spacing: 0.08em;
+       color: var(--muted); margin-bottom: 6px; }
+  p  { margin: 0 0 10px; }
+  ul { margin: 0 0 12px 18px; }
+  a { color: var(--primary); text-decoration: none; }
+  .eyebrow { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 9pt;
+             letter-spacing: 0.14em; text-transform: uppercase; color: var(--primary); }
+  header.doc-head { display: flex; justify-content: space-between; align-items: flex-start;
+                    padding-bottom: 14px; border-bottom: 2px solid var(--primary); margin-bottom: 22px; }
+  header.doc-head .brand { display: flex; gap: 12px; align-items: center; }
+  header.doc-head .brand img { width: 40px; height: 40px; }
+  header.doc-head .brand .n { font-family: "Space Grotesk", Arial, sans-serif;
+                              font-weight: 700; font-size: 13pt; color: var(--ink); }
+  header.doc-head .brand .t { color: var(--muted); font-size: 10pt; }
+  header.doc-head .meta { text-align: right; font-size: 9.5pt; color: var(--muted); }
+  header.doc-head .meta strong { color: var(--ink); }
+  .cover { padding: 8px 0 18px; }
+  .cover .to { color: var(--muted); font-size: 10.5pt; margin-top: 6px; }
+  .cover .title { margin-top: 10px; }
+  .cover .sub { color: var(--muted); margin-top: 8px; max-width: 480px; }
+  section { break-inside: avoid; margin-bottom: 12px; }
+  .panel { background: var(--panel); border-radius: 8px; padding: 14px 16px; }
+  table.items { width: 100%; border-collapse: collapse; margin-top: 6px; }
+  table.items th, table.items td { text-align: left; padding: 10px 12px;
+    border-bottom: 1px solid var(--line); font-size: 10.5pt; vertical-align: top; }
+  table.items th { font-family: "JetBrains Mono", monospace; font-size: 9pt;
+    letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+  table.items td.num, table.items th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .totals { display: flex; justify-content: flex-end; gap: 22px; margin-top: 14px;
+            font-family: "Space Grotesk", Arial, sans-serif; }
+  .totals .k { color: var(--muted); }
+  .totals .v { color: var(--ink); font-weight: 700; font-size: 14pt; }
+  .totals .v.grand { color: var(--accent); font-size: 18pt; }
+  .signature { display: flex; justify-content: space-between; gap: 40px; margin-top: 26px;
+               padding-top: 18px; border-top: 1px solid var(--line); }
+  .signature .line { border-bottom: 1px solid var(--ink); height: 40px; margin-bottom: 6px; width: 220px; }
+  footer.doc-foot { margin-top: 28px; padding-top: 12px; border-top: 1px solid var(--line);
+    font-size: 9pt; color: var(--muted); display: flex; justify-content: space-between; gap: 20px; }
+  footer.doc-foot .col strong { color: var(--ink); }
+  .stamp { display: inline-block; padding: 3px 8px; border-radius: 999px;
+    font-family: "JetBrains Mono", monospace; font-size: 8.5pt; letter-spacing: 0.06em;
+    text-transform: uppercase; }
+  .stamp.draft { color: #7a5a10; background: #fff2c7; }
+  .stamp.sent  { color: #4335c2; background: #e7e5ff; }
+  .stamp.accepted { color: #0b6b53; background: #ccf1e3; }
+</style></head><body>
+{% endmacro %}
+
+
+{% macro header(kind, doc_number, date, valid_until=None) %}
+<header class="doc-head">
+  <div class="brand">
+    {% if brand.logo_data_url %}<img src="{{ brand.logo_data_url }}" alt="logo" />{% endif %}
+    <div>
+      <div class="n">{{ brand.company_name }}</div>
+      <div class="t">{{ brand.tagline }}</div>
+    </div>
+  </div>
+  <div class="meta">
+    <div class="eyebrow">{{ kind }}</div>
+    <div><strong>{{ doc_number }}</strong></div>
+    <div>Issued {{ date }}</div>
+    {% if valid_until %}<div>Valid until {{ valid_until }}</div>{% endif %}
+  </div>
+</header>
+{% endmacro %}
+
+
+{% macro footer() %}
+<footer class="doc-foot">
+  <div class="col"><strong>{{ brand.company_name }}</strong><br />{{ brand.address }}</div>
+  <div class="col">{{ brand.email }}<br />{{ brand.phone }}</div>
+  <div class="col">{{ brand.website }}</div>
+</footer>
+</body></html>
+{% endmacro %}

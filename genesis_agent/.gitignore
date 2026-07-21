@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+.venv/
+.env
+inbox/*
+!inbox/.gitkeep
+processed/*
+!processed/.gitkeep
+captures/*
+!captures/.gitkeep

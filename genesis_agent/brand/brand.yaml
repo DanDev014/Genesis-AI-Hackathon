@@ -1,0 +1,32 @@
+# Genesis brand config. Everything in the proposal + quote templates
+# reads from this file, so this is the ONE place to change letterhead.
+#
+# Swap logo.svg for Genesis's real logo whenever you have it; keep the
+# filename or update `logo_file` below.
+
+company_name: "Genesis Digital Factory"
+tagline: "Building brands that move."
+logo_file: "logo.svg"
+
+# Brand palette. Any hex value works.
+primary_color: "#6c6cf5"
+accent_color:  "#159c7b"
+ink_color:     "#0e1119"
+text_color:    "#1c2230"
+muted_color:   "#5b6379"
+line_color:    "#d8dbe4"
+panel_color:   "#f4f5f9"
+
+# Contact block used in the footer + signature block.
+address: "1 Riverside Drive, Nairobi"
+email:   "hello@genesisdigitalfactory.com"
+phone:   "+254 700 000 000"
+website: "genesisdigitalfactory.com"
+
+# Legal boilerplate for the quotation footer.
+quote_valid_days: 30
+quote_terms: >
+  50% deposit to begin, 50% on delivery. Prices exclude applicable taxes.
+  Change requests outside the agreed scope are billed separately.
+signature_name: "Alex Karanja"
+signature_role: "Account Director"

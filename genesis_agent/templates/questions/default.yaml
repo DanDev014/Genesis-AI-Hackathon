@@ -1,0 +1,99 @@
+# Coverage checks. For each item below the agent scans the captured summary
+# for the keywords under `signals`; if none appear, the question is surfaced
+# to the team as "you didn't cover this yet — ask on the next touch".
+#
+# Replace this file with Genesis's real question template when it's ready;
+# no code change needed as long as the shape stays the same.
+#
+# Fields per item:
+#   id          stable identifier
+#   topic       short label shown in the UI
+#   priority    high | medium | low   (drives ordering)
+#   signals     lowercase keywords/phrases; ANY match = covered
+#   question    the actual question to ask the client
+#   why         one-line rationale shown in the UI
+
+items:
+  - id: decision_makers
+    topic: Decision-makers
+    priority: high
+    signals: [decision-maker, decision maker, sign off, sign-off, approver, stakeholder, "who decides", ceo, founder, owner, procurement]
+    question: "Beyond the people on this call, who else needs to approve the proposal and budget?"
+    why: "Prevents late-stage surprises from a hidden approver."
+
+  - id: budget_range
+    topic: Budget range
+    priority: high
+    signals: [budget, "$", usd, ksh, thousand, "k for", "ceiling", "range"]
+    question: "What budget range is comfortable for this project, and is there a hard ceiling?"
+    why: "Grounds the quote and prevents wasted revisions."
+
+  - id: timeline
+    topic: Timeline & key dates
+    priority: high
+    signals: [timeline, deadline, launch, go live, "by ", weeks, months, quarter, "q1", "q2", "q3", "q4"]
+    question: "Is there a launch date or hard deadline we should design the plan around?"
+    why: "Everything downstream — staffing, scope, risk — depends on this."
+
+  - id: success_metrics
+    topic: Success metrics
+    priority: high
+    signals: [kpi, metric, measure, success, target, growth, conversion, revenue goal, sales goal, "how we'll know"]
+    question: "How will you know this project has been successful three months after launch?"
+    why: "Without a metric, 'good' becomes subjective in reviews."
+
+  - id: existing_assets
+    topic: Existing brand assets
+    priority: medium
+    signals: [logo, guidelines, brand book, style guide, assets, files, existing brand]
+    question: "What existing brand assets should we start from, and what do you consider off-limits to change?"
+    why: "Scoping is very different when there's a brand book vs starting from zero."
+
+  - id: audience
+    topic: Target audience
+    priority: high
+    signals: [audience, customer, buyer, demographic, persona, segment, target market]
+    question: "Who exactly is this for? Describe the primary audience in one sentence."
+    why: "Sharpens every creative decision that follows."
+
+  - id: competitors
+    topic: Competitive context
+    priority: medium
+    signals: [competitor, competition, versus, "vs ", "compared to", differentiator, unique]
+    question: "Who do you consider your closest competitors, and how do you want to feel different from them?"
+    why: "Prevents accidentally landing on someone else's positioning."
+
+  - id: content_availability
+    topic: Content & copy availability
+    priority: medium
+    signals: [copy, content, photography, photos, video, footage, product shots, imagery]
+    question: "Is there existing copy and photography we can use, or do we need to produce it?"
+    why: "Content production, if needed, is often the biggest hidden line item."
+
+  - id: channels
+    topic: Channels & distribution
+    priority: medium
+    signals: [channel, social, instagram, tiktok, email, website, retail, wholesale, dtc, "d2c", ecommerce, shopify]
+    question: "Which channels are must-win for this launch, and which are nice-to-have?"
+    why: "Prioritises where creative production effort lands."
+
+  - id: legal_and_ip
+    topic: Legal, IP & approvals
+    priority: low
+    signals: [legal, ip, trademark, licence, license, approval, compliance, regulation]
+    question: "Any legal, IP, or compliance approvals we need to plan around?"
+    why: "Legal reviews can add weeks; better to know now."
+
+  - id: risks
+    topic: Concerns & risks
+    priority: medium
+    signals: [risk, concern, worry, tight, hard, difficult, challenge, blocker]
+    question: "What are you most nervous about going wrong on this project?"
+    why: "Client's stated risks are the ones we're accountable for mitigating."
+
+  - id: post_launch
+    topic: Post-launch support
+    priority: low
+    signals: [after launch, ongoing, retainer, support, maintenance, updates, "post launch", "post-launch"]
+    question: "Do you want ongoing support after launch, or is this a one-time engagement?"
+    why: "Opens the door to a retainer without pushing."
