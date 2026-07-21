@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from werkzeug.security import check_password_hash, generate_password_hash
+import bcrypt
 
 from app.extensions import db
 
@@ -27,12 +27,6 @@ class User(db.Model):
 
     user_type = db.Column(
         db.String(20),
-        nullable=False,
-    )
-
-    created_at = db.Column(
-        db.DateTime(timezone=True),
-        default=datetime.utcnow,
         nullable=False,
     )
 
@@ -83,13 +77,17 @@ class User(db.Model):
     # ==========================
 
     def set_password(self, password: str):
-        self.password_hash = generate_password_hash(password)
+        self.password_hash = bcrypt.hashpw(
+            password.encode("utf-8"),
+            bcrypt.gensalt(),
+        ).decode("utf-8")
 
-    def check_password(self, password: str):
-        return check_password_hash(
-            self.password_hash,
-            password,
-        )
+
+def check_password(self, password: str) -> bool:
+    return bcrypt.checkpw(
+        password.encode("utf-8"),
+        self.password_hash.encode("utf-8"),
+    )
 
     # ==========================
     # Serialization
@@ -100,11 +98,6 @@ class User(db.Model):
             "user_id": self.user_id,
             "email": self.email,
             "user_type": self.user_type,
-            "created_at": (
-                self.created_at.isoformat()
-                if self.created_at
-                else None
-            ),
         }
 
     def __repr__(self):
