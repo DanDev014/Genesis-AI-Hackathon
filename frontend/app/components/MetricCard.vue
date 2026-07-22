@@ -1,5 +1,5 @@
 <template>
-  <UCard :ui="{ root: 'ring-0 border border-neutral-200 bg-white shadow-sm' }">
+  <UCard :ui="{ root: 'ring-0 border border-neutral-200 !bg-white shadow-sm' }">
     <div class="flex items-start justify-between gap-4">
       <div>
         <p class="text-sm font-medium text-neutral-500">{{ label }}</p>

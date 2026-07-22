@@ -1,4 +1,4 @@
-from sqlalchemy import asc, desc, or_
+from sqlalchemy import asc, desc, func, or_
 
 from app.extensions import db
 from app.exceptions import (
@@ -176,8 +176,15 @@ class ClientService:
             )
 
         try:
+            # clients.client_id has no sequence/identity at the Postgres
+            # level (unlike proposals/quotes/summaries) — assign it
+            # ourselves rather than relying on a DB default that isn't there.
+            next_id = db.session.query(
+                func.coalesce(func.max(Client.client_id), 0) + 1
+            ).scalar()
 
             client = Client(
+                client_id=next_id,
                 user_id=data["user_id"],
                 name=data["name"],
                 company=data["company"],

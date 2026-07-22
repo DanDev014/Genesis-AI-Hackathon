@@ -106,6 +106,14 @@ class Quote(db.Model):
                     "client_id": self.proposal.client_id,
                     "version": self.proposal.version,
                     "status": self.proposal.status,
+                    "client": (
+                        {
+                            "name": self.proposal.client.name,
+                            "company": self.proposal.client.company,
+                        }
+                        if self.proposal.client
+                        else None
+                    ),
                 }
                 if self.proposal
                 else None

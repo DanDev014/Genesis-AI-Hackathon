@@ -3,9 +3,9 @@
     <template #content>
       <UCard
         :ui="{
-          root: 'border-0 shadow-none bg-white',
-          header: 'px-6 py-4 border-b bg-white',
-          footer: 'px-6 py-4 border-t bg-white',
+          root: 'border-0 shadow-none !bg-white',
+          header: 'px-6 py-4 border-b !bg-white',
+          footer: 'px-6 py-4 border-t !bg-white',
         }"
       >
         <template #header>
@@ -79,7 +79,7 @@
                 Cancel
               </UButton>
 
-              <UButton type="submit" color="primary" :loading="saving">
+              <UButton type="submit" color="primary" class="text-white" :loading="saving">
                 Save changes
               </UButton>
             </div>

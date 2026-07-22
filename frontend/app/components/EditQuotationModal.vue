@@ -3,9 +3,9 @@
     <template #content>
       <UCard
         :ui="{
-          root: 'border-0 shadow-none bg-white',
-          header: 'px-6 py-4 border-b bg-white',
-          footer: 'px-6 py-4 border-t bg-white',
+          root: 'border-0 shadow-none !bg-white',
+          header: 'px-6 py-4 border-b !bg-white',
+          footer: 'px-6 py-4 border-t !bg-white',
         }"
       >
         <template #header>
@@ -36,15 +36,17 @@
                   :ui="{ base: FIELD_BASE }"
                 />
                 <UInput
-                  v-model.number="line.qty"
-                  type="number"
+                  v-model="line.qty"
+                  type="text"
+                  inputmode="numeric"
                   class="col-span-2"
                   placeholder="Qty"
                   :ui="{ base: FIELD_BASE }"
                 />
                 <UInput
-                  v-model.number="line.unit_price"
-                  type="number"
+                  v-model="line.unit_price"
+                  type="text"
+                  inputmode="decimal"
                   class="col-span-3"
                   placeholder="Unit price"
                   :ui="{ base: FIELD_BASE }"
@@ -63,7 +65,7 @@
                 color="neutral"
                 variant="outline"
                 size="xs"
-                @click="form.line_items.push({ item: '', qty: 1, unit_price: 0 })"
+                @click="form.line_items.push({ item: '', qty: '1', unit_price: '0' })"
               >
                 Add line item
               </UButton>
@@ -107,7 +109,7 @@
                 Cancel
               </UButton>
 
-              <UButton type="submit" color="primary" :loading="saving">
+              <UButton type="submit" color="primary" class="text-white" :loading="saving" :disabled="!isValid">
                 Save changes
               </UButton>
             </div>
@@ -147,20 +149,34 @@ const schema = v.object({
 });
 
 const form = reactive({
-  line_items: [] as { item: string; qty: number; unit_price: number }[],
+  line_items: [] as { item: string; qty: string; unit_price: string }[],
   tax_rate: 16,
   discount_amount: 0,
   currency: "KES",
   status: "draft",
 });
 
+const isValid = computed(
+  () =>
+    form.line_items.length > 0 &&
+    form.line_items.every((li) => {
+      const qty = Number(li.qty);
+      const unitPrice = Number(li.unit_price);
+      return li.item.trim().length > 0 && Number.isFinite(qty) && qty > 0 && Number.isFinite(unitPrice) && unitPrice >= 0;
+    }) &&
+    form.status.trim().length > 0 &&
+    form.currency.trim().length > 0 &&
+    form.tax_rate >= 0 &&
+    form.discount_amount >= 0,
+);
+
 watch(
   () => props.quotation,
   (quotation) => {
     form.line_items = (quotation?.line_items ?? []).map((it: any) => ({
       item: it.item ?? "",
-      qty: it.qty ?? 1,
-      unit_price: it.unit_price ?? 0,
+      qty: String(it.qty ?? 1),
+      unit_price: String(it.unit_price ?? 0),
     }));
     form.tax_rate = quotation?.tax_rate ?? 16;
     form.discount_amount = quotation?.discount_amount ?? 0;
@@ -171,7 +187,7 @@ watch(
 );
 
 async function save() {
-  if (!props.quotation?.quote_id) return;
+  if (!props.quotation?.quote_id || !isValid.value) return;
 
   saving.value = true;
   try {
@@ -180,7 +196,13 @@ async function save() {
       {
         method: "PATCH",
         body: {
-          line_items: form.line_items.filter((li) => li.item.trim()),
+          line_items: form.line_items
+            .filter((li) => li.item.trim())
+            .map((li) => ({
+              item: li.item,
+              qty: Number(li.qty) || 0,
+              unit_price: Number(li.unit_price) || 0,
+            })),
           tax_rate: form.tax_rate,
           discount_amount: form.discount_amount,
           currency: form.currency,

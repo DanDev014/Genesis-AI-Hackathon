@@ -1,5 +1,5 @@
 <template>
-  <div class="overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-sm">
+  <div class="min-w-0 overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-sm">
     <div class="overflow-x-auto">
       <table class="min-w-full text-left text-sm">
         <thead class="border-b border-neutral-200 bg-neutral-50 text-xs uppercase tracking-wider text-neutral-500">

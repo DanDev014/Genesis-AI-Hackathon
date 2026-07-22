@@ -1,0 +1,46 @@
+Internal Sync - July 20 (post-briefing)
+VIEW RECORDING:
+Meeting Purpose
+
+Genesis internal review to lock scope and pricing for the Jitume Moringa Hackathon video before sending the proposal to Mike.
+
+Key Takeaways
+
+Scope: Team confirmed a 1-2 min summary video + 3x 30-sec social clips as the core package, with photography as an optional add-on.
+Pricing: Summary video quoted at KES 85,000. Social clips at KES 18,000 each. Photography add-on at KES 25,000 if Jitume opts in.
+Timeline: Confirmed 3 working days for the summary video after script sign-off; same-day turnaround holds for the social clips.
+Decision: Send the proposal and rate card to Mike by Friday, ahead of his committee review.
+Topics
+
+Scope Confirmation
+
+Core Deliverables:
+Summary Video: 1-2 minutes, Gen Z-styled edit per the brief.
+Social Clips: 3x 30-second cuts for social distribution.
+Optional Add-on:
+Photography: Event stills, priced separately since Mike was non-committal.
+Descoped: Partner testimonials parked for now — not enough time before the hackathon ends to schedule interviews.
+Pricing & Rate Card
+
+Summary Video: KES 85,000 (includes script, edit, one revision round).
+Social Clips: KES 18,000 each x 3 = KES 54,000.
+Photography (optional): KES 25,000.
+Total (core package, excluding photography): KES 139,000.
+Payment terms: 50% deposit on approval, balance on delivery.
+Timeline & Delivery
+
+Script approval needed by Monday to hit the 3-day turnaround for the summary video.
+Social clips: same-day delivery once footage is in hand, no change from what was quoted to Mike.
+Hard deadline: hackathon ends Wednesday 8 PM; final summary video targeted for Thursday.
+Risks & Concerns
+
+Mike is briefing two competing agencies — pricing needs to stay sharp without underselling turnaround.
+Committee approval timeline is unknown; team agreed to hold the quoted rate for 14 days.
+Next Steps
+
+Genesis:
+Finalize rate card and proposal document.
+Send proposal to Mike by Friday.
+Internal:
+Editor to block out delivery-day capacity for Wednesday–Thursday in case of same-day requests.
+One heads-up: since this shares the same "Jitume Moringa Hackathon" project name/wording patterns as your first transcript, if you test it and the LLM extraction has any transient hiccup, it could hit the same dedup-stuck-empty scenario until the fix is deployed. If that happens, it's not new — same known issue.

@@ -13,7 +13,7 @@
     <div class="grid gap-6 lg:grid-cols-5">
       <UCard
         class="lg:col-span-3"
-        :ui="{ root: 'ring-0 border border-neutral-200 bg-white shadow-lg' }"
+        :ui="{ root: 'ring-0 border border-neutral-200 !bg-white shadow-lg' }"
         ><template #header
           ><div class="flex items-center gap-3">
             <span
@@ -79,7 +79,7 @@
             block
             type="submit"
             :loading="loading"
-            class="bg-primary font-semibold text-white hover:bg-yellow-400"
+            class="text-white"
             icon="i-lucide-sparkles"
           >
             {{
@@ -94,7 +94,7 @@
       </UCard>
       <aside class="space-y-4">
         <UCard
-          :ui="{ root: 'ring-0 border border-neutral-200 bg-white shadow-lg' }"
+          :ui="{ root: 'ring-0 border border-neutral-200 !bg-white shadow-lg' }"
           ><p
             class="text-xs font-semibold uppercase tracking-widest text-primary"
           >

@@ -7,10 +7,10 @@
     <template #content>
       <UCard
         :ui="{
-          root: 'border-0 shadow-none bg-white',
-          body: 'p-0 bg-white',
-          header: 'px-6 py-4 border-b bg-white',
-          footer: 'px-6 py-4 border-t bg-white',
+          root: 'border-0 shadow-none !bg-white',
+          body: 'p-0 !bg-white',
+          header: 'px-6 py-4 border-b !bg-white',
+          footer: 'px-6 py-4 border-t !bg-white',
         }"
       >
         <template #header>

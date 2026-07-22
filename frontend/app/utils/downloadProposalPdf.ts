@@ -1,6 +1,51 @@
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
+import html2pdf from "html2pdf.js";
+
+const A4_WIDTH_PX = 794;
+const A4_HEIGHT_PX = 1123;
+
+async function downloadRenderedProposalTemplate(proposal: any) {
+  const iframe = document.createElement("iframe");
+  iframe.style.position = "fixed";
+  iframe.style.left = "-10000px";
+  iframe.style.top = "0";
+  iframe.style.width = `${A4_WIDTH_PX}px`;
+  iframe.style.height = `${A4_HEIGHT_PX}px`;
+  iframe.style.border = "none";
+  document.body.appendChild(iframe);
+
+  try {
+    await new Promise<void>((resolve) => {
+      iframe.onload = () => resolve();
+      iframe.srcdoc = proposal.proposal_html;
+    });
+
+    const target = iframe.contentDocument?.body;
+    if (!target) return false;
+
+    await html2pdf()
+      .set({
+        margin: 0,
+        filename: `proposal_${proposal.proposal_id}.pdf`,
+        html2canvas: { scale: 2, useCORS: true, windowWidth: A4_WIDTH_PX },
+        jsPDF: { unit: "pt", format: "a4", orientation: "portrait" },
+        pagebreak: { mode: ["css", "legacy"] },
+      })
+      .from(target)
+      .save();
+
+    return true;
+  } finally {
+    document.body.removeChild(iframe);
+  }
+}
 
 export async function downloadProposalPdf(proposal: any) {
+  if (proposal?.proposal_html) {
+    const rendered = await downloadRenderedProposalTemplate(proposal);
+    if (rendered) return;
+  }
+
   const pdf = await PDFDocument.create();
 
   let page = pdf.addPage([595.28, 841.89]); // A4

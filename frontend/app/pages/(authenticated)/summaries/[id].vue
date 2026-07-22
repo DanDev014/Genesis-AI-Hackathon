@@ -6,88 +6,57 @@
       color="neutral"
       variant="link"
       class="-ml-2"
-      >Back to summaries</UButton
     >
-    <section class="rounded-2xl bg-black p-6 text-white">
-      <p class="text-sm text-[#e0b818]">Discovery meeting · Jul 15, 2026</p>
-      <h1 class="mt-1 text-3xl font-semibold">Holiday campaign discovery</h1>
-      <p class="mt-3 text-sm text-neutral-300">
-        Mawingu Retail · Processed from Fathom transcript by Kora AI
-      </p>
-    </section>
-    <div class="grid gap-6 md:grid-cols-3">
-      <UCard
-        v-for="group in groups"
-        :key="group.title"
-        :ui="{ root: 'ring-0 border border-neutral-200 shadow-sm' }"
-        ><template #header
-          ><div class="flex items-center gap-2">
-            <UIcon :name="group.icon" class="text-[#c59d00]" />
-            <h2 class="font-semibold text-neutral-950">{{ group.title }}</h2>
-          </div></template
-        >
-        <ul class="space-y-3">
-          <li
-            v-for="item in group.items"
-            :key="item"
-            class="text-sm leading-6 text-neutral-600"
-          >
-            {{ item }}
-          </li>
-        </ul></UCard
-      >
+      Back to summaries
+    </UButton>
+
+    <div v-if="pending" class="space-y-6">
+      <USkeleton class="h-28 w-full rounded-2xl bg-neutral-200" />
+      <USkeleton class="h-96 w-full rounded-2xl bg-neutral-200" />
     </div>
-    <UCard :ui="{ root: 'ring-0 border border-neutral-200 shadow-sm' }"
-      ><template #header
-        ><h2 class="font-semibold text-neutral-950">
-          Suggested follow-up questions
-        </h2></template
-      >
-      <ol class="space-y-3">
-        <li
-          v-for="(question, index) in questions"
-          :key="question"
-          class="flex gap-3 text-sm text-neutral-700"
-        >
-          <span
-            class="flex size-6 shrink-0 items-center justify-center rounded-full bg-yellow-100 text-xs font-semibold text-yellow-800"
-            >{{ index + 1 }}</span
-          >{{ question }}
-        </li>
-      </ol></UCard
-    >
+
+    <p v-else-if="error" class="text-sm text-red-600">
+      Couldn't load this summary. Please try again.
+    </p>
+
+    <template v-else-if="summary">
+      <section class="rounded-2xl bg-black p-6 text-white">
+        <p class="text-sm text-[#e0b818]">
+          {{ meeting?.meeting_type || "Meeting" }} · {{ formatDate(summary.created_at) }}
+        </p>
+        <h1 class="mt-1 text-3xl font-semibold">
+          {{ meeting?.title || "Untitled meeting" }}
+        </h1>
+        <p class="mt-3 text-sm text-neutral-300">
+          {{ meeting?.key_points?.client?.company || "—" }} · Processed by Kora AI
+        </p>
+      </section>
+
+      <UCard :ui="{ root: 'ring-0 border border-neutral-200 !bg-white shadow-sm' }">
+        <MeetingKeyPoints :meeting="meeting" />
+      </UCard>
+    </template>
   </main>
 </template>
+
 <script setup lang="ts">
-const groups = [
-  {
-    title: "Objectives",
-    icon: "i-lucide-target",
-    items: [
-      "Increase holiday revenue through a unified customer journey.",
-      "Improve conversion from social campaigns into purchases.",
-    ],
-  },
-  {
-    title: "Pain points",
-    icon: "i-lucide-triangle-alert",
-    items: [
-      "Campaign performance is fragmented across teams.",
-      "Store and ecommerce experiences feel disconnected.",
-    ],
-  },
-  {
-    title: "Requirements",
-    icon: "i-lucide-list-checks",
-    items: [
-      "Phased delivery before the holiday campaign.",
-      "Leadership needs measurable conversion reporting.",
-    ],
-  },
-];
-const questions = [
-  "Which campaign and conversion metrics will define a successful launch?",
-  "Who are the final decision-makers for the experience direction?",
-  "What data and customer research can the team access in week one?",
-];
+const route = useRoute();
+const summaryId = route.params.id as string;
+
+const {
+  data: response,
+  pending,
+  error,
+} = await useLazyFetch<{ success: boolean; data: any }>(`/api/summaries/${summaryId}`);
+
+const summary = computed(() => response.value?.data ?? null);
+const meeting = computed(() => summary.value?.first_meeting_deliverables ?? null);
+
+function formatDate(iso: string) {
+  return new Date(iso).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
 </script>

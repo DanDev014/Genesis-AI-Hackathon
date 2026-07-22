@@ -2,30 +2,29 @@
   <main class="flex flex-col gap-4 p-6">
     <div class="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
       <div>
-        <h1 class="mt-1 text-xl font-semibold tracking-tight text-primary">
+        <h1 class="mt-1 text-xl font-semibold tracking-tight text-black">
           Clients
         </h1>
       </div>
-      <UButton
-        icon="i-lucide-user-plus"
-        class="text-white font-semibold bg-primary hover:bg-yellow-400"
+      <UButton icon="i-lucide-user-plus" class="text-white" @click="createOpen = true"
         >Add client</UButton
       >
     </div>
-    <div class="flex flex-row gap-3 w-full sm:flex-row">
+    <div class="flex min-w-0 flex-col gap-3 sm:flex-row">
       <UInput
         v-model="search"
         icon="i-lucide-search"
         placeholder="Search clients or company..."
-        class="w-full sm:max-w-sm"
+        class="min-w-0 w-full sm:max-w-sm"
         :ui="{
           base: 'bg-white text-neutral-900 ring-neutral-200 focus:ring-2 focus:ring-[#e0b818]',
         }"
         @update:model-value="onFilterChange"
-      /><USelect
+      />
+      <USelect
         v-model="status"
         :items="statuses"
-        class="w-full sm:w-48"
+        class="min-w-0 w-full sm:w-48"
         :ui="{
           base: 'bg-white text-neutral-900 ring-neutral-200 focus:ring-2 focus:ring-[#e0b818]',
         }"
@@ -38,20 +37,7 @@
     </p>
 
     <!-- Initial load: no data yet -->
-    <div v-if="pending && !data" class="space-y-2 rounded-lg border border-neutral-200 bg-white p-4">
-      <div
-        v-for="i in 8"
-        :key="i"
-        class="flex items-center gap-4 py-2"
-      >
-        <USkeleton class="h-4 w-1/5 bg-neutral-200" />
-        <USkeleton class="h-4 w-1/6 bg-neutral-200" />
-        <USkeleton class="h-4 w-20 bg-neutral-200" />
-        <USkeleton class="h-4 w-1/6 bg-neutral-200" />
-        <USkeleton class="h-4 w-24 bg-neutral-200" />
-        <USkeleton class="h-6 w-20 ml-auto bg-neutral-200" />
-      </div>
-    </div>
+    <TableSkeleton v-if="pending && !data" :columns="6" :rows="8" />
 
     <!-- Loaded (or refetching): show table, dim + spinner while refetching -->
     <div v-else class="relative">
@@ -104,6 +90,8 @@
       </p>
       <UPagination v-model:page="page" :total="total" :items-per-page="limit" />
     </div>
+
+    <CreateClientModal v-model="createOpen" @created="onClientCreated" />
   </main>
 </template>
 
@@ -134,6 +122,7 @@ const debouncedSearch = ref("");
 const status = ref("All statuses");
 const page = ref(1);
 const limit = ref(20);
+const createOpen = ref(false);
 
 const statuses = [
   "All statuses",
@@ -168,10 +157,14 @@ const query = computed(() => ({
   status: status.value === "All statuses" ? undefined : status.value,
 }));
 
-const { data, pending, error } = useLazyFetch<ClientsResponse>("/api/clients", {
+const { data, pending, error, refresh } = useLazyFetch<ClientsResponse>("/api/clients", {
   query,
   watch: [page, query],
 });
+
+function onClientCreated() {
+  refresh();
+}
 
 function formatDate(iso: string | null) {
   if (!iso) return "No calls yet";

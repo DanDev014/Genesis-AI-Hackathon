@@ -2,11 +2,14 @@
   <UDashboardGroup class="h-screen">
     <UDashboardSidebar
       class="bg-black text-white border-r border-neutral-800"
-      :ui="{ root: 'w-72' }"
+      :ui="{ root: 'w-50' }"
     >
       <!-- Logo -->
       <UDashboardSidebarHeader>
-        <div>Logo</div>
+        <NuxtLink to="/dashboard" class="flex items-center gap-3 px-1 py-2">
+          <AppLogoMark class="size-8 shrink-0" />
+          <span class="text-sm font-semibold tracking-tight text-white">Kora AI</span>
+        </NuxtLink>
       </UDashboardSidebarHeader>
 
       <!-- Navigation -->

@@ -13,6 +13,7 @@ flask-sqlalchemy = "*"
 flask-migrate = "*"
 psycopg = "*"
 bcrypt = "*"
+gunicorn = "*"
 
 [dev-packages]
 
