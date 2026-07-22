@@ -52,7 +52,7 @@ class Proposal(db.Model):
     )
 
     timeline_milestones = db.Column(
-        JSONB,
+        db.Text,
         nullable=False,
     )
 

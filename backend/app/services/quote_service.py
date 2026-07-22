@@ -96,3 +96,24 @@ class QuoteService:
             return None
 
         return quote.to_dict()
+
+    @staticmethod
+    def create_quote(data):
+
+        quote = Quote(
+            proposal_id=data["proposal_id"],
+            created_by_user_id=data["user_id"],
+
+            currency=data.get("currency", "KES"),
+
+            total_amount=data["total_amount"],
+
+            line_items=data["line_items"],
+
+            status="draft",
+        )
+
+        db.session.add(quote)
+        db.session.commit()
+
+        return quote.to_dict()
