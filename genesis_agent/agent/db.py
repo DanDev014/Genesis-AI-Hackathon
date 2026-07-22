@@ -217,11 +217,9 @@ def save_proposal(data: dict) -> dict:
     row = _exec(
         """
         insert into proposals
-          (proposal_id, client_id, scope_of_work, deliverables_list, timeline_milestones,
+          (client_id, scope_of_work, deliverables_list, timeline_milestones,
            version, status, generated_by, created_at)
-        values (
-          (select coalesce(max(proposal_id), 0) + 1 from proposals),
-          %s, %s, %s::jsonb, %s::jsonb, %s, %s, %s, %s)
+        values (%s, %s, %s::jsonb, %s::jsonb, %s, %s, %s, %s)
         returning proposal_id, created_at
         """,
         (
@@ -373,11 +371,9 @@ def save_quote(data: dict) -> dict:
 
     row = _exec("""
         insert into quotes
-          (quote_id, proposal_id, currency, tax_rate, discount_amount, total_amount,
+          (proposal_id, currency, tax_rate, discount_amount, total_amount,
            validity_days, status, line_items, created_at)
-        values (
-          (select coalesce(max(quote_id), 0) + 1 from quotes),
-          %s, %s, %s, %s, %s, %s, %s, %s::jsonb, %s)
+        values (%s, %s, %s, %s, %s, %s, %s, %s::jsonb, %s)
         returning quote_id, created_at
     """, (
         proposal_id,
