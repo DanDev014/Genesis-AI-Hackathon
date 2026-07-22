@@ -1,7 +1,7 @@
 from sqlalchemy import asc, desc
 
 from app.models.proposal import Proposal
-
+from app.extensions import db
 
 class ProposalService:
 
@@ -83,5 +83,32 @@ class ProposalService:
 
         if not proposal:
             return None
+
+        return proposal.to_dict()
+
+
+    @staticmethod
+    def create_proposal(data):
+
+        proposal = Proposal(
+            client_id=data["client_id"],
+
+            created_by_user_id=data["user_id"],
+
+            linked_transcript_id=data.get("transcript_id"),
+
+            scope_of_work=data["scope_of_work"],
+
+            deliverables_list=data["deliverables_list"],
+
+            timeline_milestones=data["timeline_milestones"],
+
+            generated_by=data.get("generated_by", "ai"),
+
+            status=data.get("status", "draft"),
+        )
+
+        db.session.add(proposal)
+        db.session.commit()
 
         return proposal.to_dict()

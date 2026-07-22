@@ -1,161 +1,204 @@
 <template>
-  <div class="p-6 space-y-6 text-white">
-    <div class="flex items-center justify-between">
+  <main class="flex flex-col gap-4 p-6">
+    <div class="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
       <div>
-        <h1 class="text-2xl text-black font-bold">Clients</h1>
-        <p class="text-neutral-400 text-sm">
-          {{ filteredClients.length }} clients tracked
-        </p>
+        <h1 class="mt-1 text-xl font-semibold tracking-tight text-primary">
+          Clients
+        </h1>
       </div>
-      <div class="flex items-center gap-3">
-        <UInput
-          v-model="search"
-          icon="i-lucide-search"
-          placeholder="Search clients..."
-          class="w-64"
-          :ui="{
-            base: 'bg-white text-neutral-900 ring-1 ring-neutral-300 focus:ring-2 focus:ring-orange-500 focus-visible:ring-2 focus-visible:ring-orange-500',
-          }"
-        />
-
-        <USelect
-          v-model="statusFilter"
-          :items="statusOptions"
-          placeholder="Filter"
-          class="w-40"
-          :ui="{
-            base: 'bg-white text-neutral-900 ring-1 ring-neutral-300 focus:ring-2 focus:ring-orange-500 focus-visible:ring-2 focus-visible:ring-orange-500',
-          }"
-        />
-      </div>
-    </div>
-
-    <!-- Loading -->
-    <div
-      v-if="pending"
-      class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
-    >
-      <USkeleton v-for="i in 6" :key="i" class="h-32 w-full rounded-lg" />
-    </div>
-
-    <!-- Error — surfaces the real DB/backend message from apiRequest -->
-    <UAlert
-      v-else-if="error"
-      color="error"
-      variant="subtle"
-      icon="i-lucide-alert-triangle"
-      title="Couldn't load clients"
-      :description="
-        error.statusMessage || 'Something went wrong talking to the server.'
-      "
-    >
-      <template #actions>
-        <UButton size="xs" color="error" variant="soft" @click="refresh()">
-          Retry
-        </UButton>
-      </template>
-    </UAlert>
-
-    <!-- Empty -->
-    <div
-      v-else-if="filteredClients.length === 0"
-      class="text-neutral-400 text-center py-12"
-    >
-      No clients match your filters.
-    </div>
-
-    <!-- Data -->
-    <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-      <UCard
-        v-for="client in filteredClients"
-        :key="client.client_id"
-        :ui="{
-          root: 'ring-0 bg-white shadow-md hover:shadow-xl hover:-translate-y-1 transition-all duration-200 cursor-pointer overflow-hidden',
-        }"
-        @click="navigateTo(`/clients/${client.client_id}`)"
+      <UButton
+        icon="i-lucide-user-plus"
+        class="text-white font-semibold bg-primary hover:bg-yellow-400"
+        >Add client</UButton
       >
-        <div class="flex items-start justify-between mb-3">
-          <div>
-            <h3 class="font-semibold text-neutral-900">{{ client.company }}</h3>
-            <p class="text-sm text-neutral-500">{{ client.name }}</p>
-          </div>
-          <UBadge
-            :color="statusColor(client.status)"
-            variant="subtle"
-            size="sm"
-          >
-            {{ client.status }}
-          </UBadge>
-        </div>
-
-        <div class="flex items-center gap-2 text-sm text-neutral-500 mb-3">
-          <UIcon name="i-lucide-briefcase" class="w-4 h-4 text-primary-500" />
-          {{ client.industry }}
-        </div>
-
-        <div
-          class="flex items-center justify-between pt-3 border-t border-neutral-200 text-xs text-neutral-500"
-        >
-          <span class="flex items-center gap-1">
-            <UIcon name="i-lucide-user" class="w-3.5 h-3.5 text-primary-500" />
-            {{ client.assigned_account_manager?.full_name ?? "Unassigned" }}
-          </span>
-          <span class="flex items-center gap-1">
-            <UIcon
-              name="i-lucide-phone-call"
-              class="w-3.5 h-3.5 text-primary-500"
-            />
-            {{
-              client.last_call_at
-                ? new Date(client.last_call_at).toLocaleDateString()
-                : "No calls yet"
-            }}
-          </span>
-        </div>
-      </UCard>
     </div>
-  </div>
+    <div class="flex flex-row gap-3 w-full sm:flex-row">
+      <UInput
+        v-model="search"
+        icon="i-lucide-search"
+        placeholder="Search clients or company..."
+        class="w-full sm:max-w-sm"
+        :ui="{
+          base: 'bg-white text-neutral-900 ring-neutral-200 focus:ring-2 focus:ring-[#e0b818]',
+        }"
+        @update:model-value="onFilterChange"
+      /><USelect
+        v-model="status"
+        :items="statuses"
+        class="w-full sm:w-48"
+        :ui="{
+          base: 'bg-white text-neutral-900 ring-neutral-200 focus:ring-2 focus:ring-[#e0b818]',
+        }"
+        @update:model-value="onFilterChange"
+      />
+    </div>
+
+    <p v-if="error" class="text-sm text-red-600">
+      Couldn't load clients. Please try again.
+    </p>
+
+    <!-- Initial load: no data yet -->
+    <div v-if="pending && !data" class="space-y-2 rounded-lg border border-neutral-200 bg-white p-4">
+      <div
+        v-for="i in 8"
+        :key="i"
+        class="flex items-center gap-4 py-2"
+      >
+        <USkeleton class="h-4 w-1/5 bg-neutral-200" />
+        <USkeleton class="h-4 w-1/6 bg-neutral-200" />
+        <USkeleton class="h-4 w-20 bg-neutral-200" />
+        <USkeleton class="h-4 w-1/6 bg-neutral-200" />
+        <USkeleton class="h-4 w-24 bg-neutral-200" />
+        <USkeleton class="h-6 w-20 ml-auto bg-neutral-200" />
+      </div>
+    </div>
+
+    <!-- Loaded (or refetching): show table, dim + spinner while refetching -->
+    <div v-else class="relative">
+      <div
+        v-if="pending"
+        class="absolute inset-0 z-10 flex items-center justify-center gap-2 rounded-lg bg-white/70 text-sm text-neutral-500"
+      >
+        <UIcon name="i-lucide-loader-2" class="size-4 animate-spin" />
+        Loading clients...
+      </div>
+      <DataTable
+        :columns="columns"
+        :rows="rows"
+        row-key="client_id"
+        :class="{ 'opacity-50': pending }"
+        ><template #cell-client="{ row }"
+          ><div>
+            <p class="font-medium text-neutral-900">{{ row.name }}</p>
+            <p class="text-xs text-neutral-500">{{ row.industry }}</p>
+          </div></template
+        ><template #cell-status="{ row }"
+          ><UBadge
+            :color="
+              row.status === 'Active'
+                ? 'success'
+                : row.status === 'Proposal sent'
+                  ? 'warning'
+                  : 'neutral'
+            "
+            variant="subtle"
+            >{{ row.status || "Unknown" }}</UBadge
+          ></template
+        ><template #cell-owner="{ row }">{{ row.owner }}</template
+        ><template #cell-lastMeeting="{ row }">{{ row.lastMeeting }}</template
+        ><template #cell-action="{ row }"
+          ><UButton
+            :to="`/clients/${row.client_id}`"
+            color="neutral"
+            variant="outline"
+            size="xs"
+            >View client</UButton
+          ></template
+        ></DataTable
+      >
+    </div>
+
+    <div class="flex flex-col items-center justify-between gap-3 sm:flex-row">
+      <p class="text-sm text-neutral-500">
+        Showing {{ rangeStart }}-{{ rangeEnd }} of {{ total }} clients
+      </p>
+      <UPagination v-model:page="page" :total="total" :items-per-page="limit" />
+    </div>
+  </main>
 </template>
 
 <script setup lang="ts">
-const search = ref("");
-const statusFilter = ref<string | null>(null);
+interface AccountManager {
+  staff_id: number;
+  full_name: string;
+}
 
-const statusOptions = [
-  { label: "All Statuses", value: null },
-  { label: "Lead", value: "lead" },
-  { label: "Contacted", value: "contacted" },
-  { label: "Proposal Sent", value: "proposal sent" },
-  { label: "Active Client", value: "active client" },
-  { label: "Won", value: "won" },
-  { label: "Lost", value: "lost" },
+interface ApiClient {
+  client_id: number;
+  name: string;
+  company: string;
+  industry: string;
+  status: string | null;
+  assigned_account_manager: AccountManager | null;
+  last_call_at: string | null;
+  created_at: string;
+}
+
+interface ClientsResponse {
+  data: ApiClient[];
+  meta: { page: number; limit: number; total: number };
+}
+
+const search = ref("");
+const debouncedSearch = ref("");
+const status = ref("All statuses");
+const page = ref(1);
+const limit = ref(20);
+
+const statuses = [
+  "All statuses",
+  "Active",
+  "Discovery",
+  "Proposal sent",
+  "Won",
 ];
 
-// Calls the BFF route (server/api/clients/index.get.ts), which proxies to Flask
-const { data, pending, error, refresh } = await useFetch("/api/clients");
+const columns = [
+  { key: "client", label: "Client" },
+  { key: "company", label: "Company" },
+  { key: "status", label: "Status" },
+  { key: "owner", label: "Account owner" },
+  { key: "lastMeeting", label: "Last meeting" },
+  { key: "action", label: "" },
+];
 
-const clients = computed(() => data.value?.data ?? []);
+let debounceTimer: ReturnType<typeof setTimeout>;
+function onFilterChange() {
+  clearTimeout(debounceTimer);
+  debounceTimer = setTimeout(() => {
+    debouncedSearch.value = search.value;
+    page.value = 1;
+  }, 300);
+}
 
-const filteredClients = computed(() =>
-  clients.value.filter((c: any) => {
-    const matchesSearch =
-      c.company.toLowerCase().includes(search.value.toLowerCase()) ||
-      c.name.toLowerCase().includes(search.value.toLowerCase());
-    const matchesStatus =
-      !statusFilter.value || c.status === statusFilter.value;
-    return matchesSearch && matchesStatus;
-  }),
+const query = computed(() => ({
+  page: page.value,
+  limit: limit.value,
+  search: debouncedSearch.value || undefined,
+  status: status.value === "All statuses" ? undefined : status.value,
+}));
+
+const { data, pending, error } = useLazyFetch<ClientsResponse>("/api/clients", {
+  query,
+  watch: [page, query],
+});
+
+function formatDate(iso: string | null) {
+  if (!iso) return "No calls yet";
+  return new Date(iso).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+const rows = computed(() =>
+  (data.value?.data ?? []).map((client) => ({
+    client_id: client.client_id,
+    name: client.name,
+    company: client.company,
+    industry: client.industry,
+    status: client.status,
+    owner: client.assigned_account_manager?.full_name ?? "Unassigned",
+    lastMeeting: formatDate(client.last_call_at),
+  })),
 );
 
-function statusColor(status: string) {
-  const map: Record<string, string> = {
-    lead: "neutral",
-    contacted: "info",
-    "proposal sent": "warning",
-    "active client": "success",
-    won: "success",
-    lost: "error",
-  };
-  return map[status?.toLowerCase()] ?? "neutral";
-}
+const total = computed(() => data.value?.meta?.total ?? 0);
+const rangeStart = computed(() =>
+  total.value === 0 ? 0 : (page.value - 1) * limit.value + 1,
+);
+const rangeEnd = computed(() =>
+  Math.min(page.value * limit.value, total.value),
+);
 </script>

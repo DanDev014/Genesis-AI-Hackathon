@@ -41,3 +41,14 @@ def get_proposal(proposal_id):
         raise ResourceNotFound("Proposal not found")
 
     return jsonify(proposal), 200
+
+
+@proposals_bp.post("/proposals")
+def create_proposal():
+    proposal = ProposalService.create_proposal(request.json)
+
+    return jsonify({
+        "success": True,
+        "message": "Proposal created successfully",
+        "data": proposal,
+    }), 201

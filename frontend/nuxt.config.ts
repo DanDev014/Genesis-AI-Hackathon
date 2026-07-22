@@ -11,7 +11,8 @@ export default defineNuxtConfig({
     '/': { prerender: true }
   },
   runtimeConfig: {
-    apiBaseUrl: process.env.API_BASE_URL
+    apiBaseUrl: process.env.API_BASE_URL,
+    agentBaseUrl: process.env.AGENT_BASE_URL
   },
   compatibilityDate: '2026-06-30',
 

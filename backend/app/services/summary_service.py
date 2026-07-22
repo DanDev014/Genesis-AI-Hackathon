@@ -110,10 +110,9 @@ class SummaryService:
         try:
 
             summary = Summary(
+                user_id=data["user_id"],
                 client_id=data["client_id"],
-                first_meeting_deliverables=data[
-                    "first_meeting_deliverables"
-                ],
+                first_meeting_deliverables=data["first_meeting_deliverables"],
                 created_at=datetime.now(UTC),
             )
 

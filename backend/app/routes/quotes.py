@@ -48,3 +48,14 @@ def get_quote(quote_id):
         ), 404
 
     return jsonify(result), 200
+
+@quotes_bp.post("/quotes")
+def create_quote():
+
+    quote = QuoteService.create_quote(request.json)
+
+    return jsonify({
+        "success": True,
+        "message": "Quote created successfully",
+        "data": quote,
+    }), 201
