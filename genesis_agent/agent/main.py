@@ -22,6 +22,7 @@ from __future__ import annotations
 import asyncio
 import json
 from pathlib import Path
+from typing import Literal
 
 from dotenv import load_dotenv
 from pathlib import Path
@@ -30,6 +31,7 @@ load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 from fastapi import Body, FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, Response, RedirectResponse
+from pydantic import BaseModel, ConfigDict
 
 from agent import brand as brand_mod
 from agent import brief as brief_mod, capture, db, llm_client, questions, quickbooks, renderer, store, watcher
@@ -102,7 +104,32 @@ def capture_questions(name: str):
     return questions.analyse(data.get("summary", ""))
 
 
-def _capture_payload(payload: dict) -> dict:
+# The frontend decides this — no more guessing from speaker-domain heuristics
+# or a nested "meeting.meeting_type" field. Discovery calls haven't had scope
+# or pricing locked yet, so they just get the summary + deliverables back.
+# Internal meetings are where the team locks both, so they go straight to a
+# draft proposal + quote via the templates — zero extra LLM tokens either way.
+_MEETING_TYPE_ALIASES = {
+    "discovery_meeting": "discovery_call",
+    "internal": "internal",
+}
+
+FathomMeetingType = Literal["discovery_meeting", "internal"]
+
+
+class FathomWebhookPayload(BaseModel):
+    """Fathom's own fields, or a pre-digested call-intelligence payload —
+    any shape is accepted (extra="allow"); only meeting_type is required."""
+    model_config = ConfigDict(extra="allow")
+    meeting_type: FathomMeetingType
+
+
+def _capture_payload(payload: dict, meeting_type: str) -> dict:
+    meeting_type = _MEETING_TYPE_ALIASES[meeting_type]
+    # Top-level meeting_type is our own routing control field, not meeting
+    # content — drop it so it doesn't leak into the flattened summary text.
+    payload = {k: v for k, v in payload.items() if k != "meeting_type"}
+
     parts = capture.extract_from_payload(payload)
     if not parts["summary"]:
         return {"ok": False,
@@ -115,27 +142,76 @@ def _capture_payload(payload: dict) -> dict:
         title=parts["title"],
         external_id=parts["external_id"],
         raw=parts.get("structured_root") or payload,
-        meeting_type_hint=parts.get("meeting_type_hint", ""),
+        meeting_type_hint=meeting_type,
         extra_action_items=parts.get("action_items", []),
     )
-    return {"ok": True, "captured": record}
+
+    if meeting_type == "internal":
+        return _internal_meeting_deliverables(record)
+
+    deliverables = _proposal_data_from_key_points(
+        record.get("title", ""), record.get("key_points", {})
+    )["deliverables"]
+    return {"ok": True, "meeting_type": "discovery_call", "captured": record,
+            "summary": parts["summary"], "deliverables": deliverables}
+
+
+def _internal_meeting_deliverables(record: dict) -> dict:
+    """Internal meeting -> draft proposal + quote straight from key_points,
+    rendered through the same Jinja templates /proposals and /quotes use.
+    No LLM call — the structured extraction already happened at capture
+    time (and was cached if it went through the script endpoint)."""
+    key_points = record.get("key_points", {})
+    proposal_data = _proposal_data_from_key_points(record.get("title", ""), key_points)
+
+    try:
+        proposal = store.save_proposal(proposal_data)
+        quote = store.save_quote({
+            "proposal_id": proposal.get("id"),
+            "client_company": proposal_data["client_company"],
+            "client_name": proposal_data["client_name"],
+            "title": proposal_data["title"],
+            "line_items": _quote_line_items_from_key_points(key_points),
+            "currency": (key_points.get("budget") or {}).get("currency", "KES"),
+            "status": "draft",
+        })
+    except Exception as exc:
+        return {"ok": False, "meeting_type": "internal", "captured": record,
+                "reason": f"Could not draft proposal/quote: {exc}"}
+
+    return {
+        "ok": True,
+        "meeting_type": "internal",
+        "captured": record,
+        "proposal": proposal,
+        "quote": quote,
+        "proposal_html": renderer.render_proposal_html(proposal),
+        "quote_html": renderer.render_quote_html(quote),
+        "proposal_url": f"/proposals/{proposal.get('id')}",
+        "quote_url": f"/quotes/{quote.get('id')}",
+    }
 
 
 @app.post("/webhook/fathom")
-async def fathom_webhook(payload: dict = Body(...)):
+async def fathom_webhook(payload: FathomWebhookPayload):
     """For automations that already send JSON — Fathom's own fields, or a
-    pre-digested call-intelligence payload. Zero LLM tokens either way."""
-    return _capture_payload(payload)
+    pre-digested call-intelligence payload. meeting_type is required:
+    "discovery_meeting" gets back the summary + deliverables; "internal"
+    (scope/pricing already locked by the team) gets back a draft proposal +
+    quote rendered from the templates. Zero LLM tokens either way."""
+    return _capture_payload(payload.model_dump(), payload.meeting_type)
 
 
 @app.post("/webhook/fathom/script")
-async def fathom_webhook_script(text: str = Body(..., media_type="text/plain")):
+async def fathom_webhook_script(meeting_type: FathomMeetingType,
+                                text: str = Body(..., media_type="text/plain")):
     """For pasting a raw script/transcript straight from Fathom — no JSON
-    required. If it happens to already be JSON, that's used directly (zero
-    tokens, same as /webhook/fathom). Otherwise one cached, fast-tier LLM
-    call turns it into the same structured shape before it enters the
-    normal capture pipeline — works the same for a discovery call or an
-    internal meeting; meeting_type comes out of the extraction itself."""
+    required. meeting_type is a required query parameter (send it as
+    ?meeting_type=discovery_meeting or ?meeting_type=internal). If the body
+    happens to already be JSON, that's used directly (zero tokens, same as
+    /webhook/fathom). Otherwise one cached, fast-tier LLM call turns it into
+    the same structured shape before it enters the normal capture pipeline —
+    meeting_type here always wins over whatever the extraction infers."""
     text = (text or "").strip()
     if not text:
         return {"ok": False, "reason": "Empty body."}
@@ -146,7 +222,7 @@ async def fathom_webhook_script(text: str = Body(..., media_type="text/plain")):
     except Exception:
         payload = capture.extract_structured_via_llm(text) or {"transcript": text}
 
-    return _capture_payload(payload)
+    return _capture_payload(payload, meeting_type)
 
 
 # --------------------------- branded document rendering ---------------------------
