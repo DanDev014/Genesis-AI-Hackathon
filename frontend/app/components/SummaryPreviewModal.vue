@@ -19,10 +19,10 @@ const meeting = computed(
 </script>
 
 <template>
-  <UModal v-model:open="open" :dismissible="false" :ui="{ root: 'bg-white' }">
+  <UModal v-model:open="open" :dismissible="false">
     <template #content>
-      <div class="space-y-6 p-6">
-        <div class="text-center">
+      <div class="flex max-h-[85vh] flex-col p-6">
+        <div class="shrink-0 text-center">
           <UIcon
             name="i-lucide-circle-check-big"
             class="mx-auto mb-3 size-14 text-success"
@@ -35,9 +35,12 @@ const meeting = computed(
           </p>
         </div>
 
-        <UDivider />
+        <UDivider class="my-6 shrink-0" />
 
-        <div v-if="meeting" class="max-h-[60vh] space-y-6 overflow-y-auto pr-1">
+        <div
+          v-if="meeting"
+          class="min-h-0 flex-1 space-y-6 overflow-y-auto pr-1"
+        >
           <!-- Meeting -->
           <div>
             <h3 class="text-lg font-semibold">
@@ -220,13 +223,13 @@ const meeting = computed(
           </div>
         </div>
 
-        <div v-else class="py-8 text-center text-sm text-muted">
+        <div v-else class="min-h-0 flex-1 py-8 text-center text-sm text-muted">
           No summary data available.
         </div>
 
-        <UDivider />
+        <UDivider class="my-6 shrink-0" />
 
-        <div class="flex justify-end gap-3">
+        <div class="flex shrink-0 justify-end gap-3">
           <UButton
             color="neutral"
             variant="soft"

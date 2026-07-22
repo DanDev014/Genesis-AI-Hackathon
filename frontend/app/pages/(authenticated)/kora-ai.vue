@@ -125,6 +125,9 @@
             </div>
           </div></UCard
         >
+        <UButton @click="proposalModalOpen = true">
+          Open Proposal Modal
+        </UButton>
       </aside>
     </div>
   </main>
@@ -134,6 +137,11 @@
     @close="summaryModalOpen = false"
     @download="downloadSummary"
     @view="viewSummary"
+  />
+  <ProposalQuotationModal
+    v-model="proposalModalOpen"
+    :proposal="generatedProposal"
+    :quotation="generatedQuotation"
   />
 </template>
 
@@ -145,6 +153,11 @@ const loading = ref(false);
 
 const summaryModalOpen = ref(false);
 const generatedSummary = ref(null);
+
+const proposalModalOpen = ref(false);
+
+const generatedProposal = ref(null);
+const generatedQuotation = ref(null);
 
 const authStore = useAuthStore();
 const toast = useToast();
@@ -211,8 +224,17 @@ async function onSubmit(event: { data: Schema }) {
 
     console.log(response);
     if (response.success) {
-      generatedSummary.value = response.data;
-      summaryModalOpen.value = true;
+      if (state.meetingType === "internal") {
+        generatedProposal.value = response.proposal;
+        generatedQuotation.value = response.quotation;
+
+        proposalModalOpen.value = true;
+      } else {
+        generatedSummary.value = response.data;
+        summaryModalOpen.value = true;
+      }
+
+      resetForm();
     }
   } catch (error) {
     console.error("Error processing transcript", error);

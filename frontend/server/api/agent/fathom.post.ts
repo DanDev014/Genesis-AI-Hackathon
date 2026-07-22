@@ -24,6 +24,9 @@ export default defineEventHandler(async (event) => {
       ok: boolean;
       meeting_type?: string;
       captured?: Record<string, any>;
+      proposal?: Record<string, any>;
+      quote?: Record<string, any>;
+      proposal_html?: string;
       reason?: string;
     }>(
       `/webhook/fathom/script?meeting_type=${encodeURIComponent(
@@ -56,9 +59,6 @@ export default defineEventHandler(async (event) => {
 
     /**
      * Normalize meeting type.
-     *
-     * The script endpoint currently returns "discovery_call",
-     * while the summary endpoint expects "discovery_meeting".
      */
     if (scriptResponse.meeting_type === "discovery_call") {
       scriptResponse.meeting_type = "discovery_meeting";
@@ -69,51 +69,21 @@ export default defineEventHandler(async (event) => {
     }
 
     /**
-     * Step 2:
-     * Generate the discovery summary.
+     * Route to the appropriate workflow.
      */
-    const summaryResponse = await agentRequest<{
-      ok: boolean;
-      captured?: Record<string, unknown>;
-      reason?: string;
-    }>("/webhook/fathom", {
-      method: "POST",
-      body: scriptResponse,
-      headers: {
-        Accept: "application/json",
-      },
-    });
-
-    console.log("Summary response:", summaryResponse);
-
-    if (!summaryResponse.ok || !summaryResponse.captured) {
-      throw createError({
-        statusCode: 400,
-        statusMessage:
-          summaryResponse.reason ?? "Failed to generate meeting summary.",
-        data: {
-          error:
-            summaryResponse.reason ?? "Failed to generate meeting summary.",
-        },
+    if (body.meetingType === "internal") {
+      return await handleInternalMeeting({
+        body,
+        scriptResponse,
       });
     }
 
-    /**
-     * Step 3:
-     * Persist the summary.
-     */
-    const savedSummary = await apiRequest("/summaries", {
-      method: "POST",
-      body: {
-        user_id: body.userId,
-        client_id: body.clientId,
-        first_meeting_deliverables: scriptResponse.captured,
-      },
+    return await handleDiscoveryMeeting({
+      body,
+      scriptResponse,
     });
-
-    return savedSummary;
   } catch (error: any) {
-    console.error("=== SUMMARY GENERATION ERROR ===");
+    console.error("=== AI WORKFLOW ERROR ===");
     console.error(error);
 
     if (error?.data) {
@@ -130,10 +100,154 @@ export default defineEventHandler(async (event) => {
 
     throw createError({
       statusCode: 500,
-      statusMessage: "Failed to generate meeting summary.",
+      statusMessage: "Failed to process meeting.",
       data: {
-        error: "Something went wrong while generating the meeting summary.",
+        error: "Something went wrong while processing the meeting.",
       },
     });
   }
 });
+
+/**
+ * ============================================================
+ * Discovery Meeting Workflow
+ * ============================================================
+ */
+
+async function handleDiscoveryMeeting({
+  body,
+  scriptResponse,
+}: {
+  body: {
+    transcript: string;
+    meetingType: string;
+    clientId: number;
+    userId: number;
+  };
+  scriptResponse: any;
+}) {
+  /**
+   * Generate summary.
+   */
+  const summaryResponse = await agentRequest<{
+    ok: boolean;
+    captured?: Record<string, unknown>;
+    reason?: string;
+  }>("/webhook/fathom", {
+    method: "POST",
+    body: scriptResponse,
+    headers: {
+      Accept: "application/json",
+    },
+  });
+
+  console.log("Summary response:", summaryResponse);
+
+  if (!summaryResponse.ok || !summaryResponse.captured) {
+    throw createError({
+      statusCode: 400,
+      statusMessage:
+        summaryResponse.reason ?? "Failed to generate meeting summary.",
+      data: {
+        error: summaryResponse.reason ?? "Failed to generate meeting summary.",
+      },
+    });
+  }
+
+  /**
+   * Persist summary.
+   */
+  const savedSummary = await apiRequest("/summaries", {
+    method: "POST",
+    body: {
+      user_id: body.userId,
+      client_id: body.clientId,
+      first_meeting_deliverables: scriptResponse.captured,
+    },
+  });
+
+  return savedSummary;
+}
+
+/**
+ * ============================================================
+ * Internal Meeting Workflow
+ * ============================================================
+ */
+
+async function handleInternalMeeting({
+  body,
+  scriptResponse,
+}: {
+  body: {
+    transcript: string;
+    meetingType: string;
+    clientId: number;
+    userId: number;
+  };
+  scriptResponse: any;
+}) {
+  /**
+   * Step 1:
+   * Persist the proposal.
+   */
+  const savedProposal = await apiRequest("/proposals", {
+    method: "POST",
+    body: {
+      client_id: body.clientId,
+      user_id: body.userId,
+
+      scope_of_work: scriptResponse.proposal.scope,
+
+      deliverables_list: scriptResponse.proposal.deliverables,
+
+      timeline_milestones: scriptResponse.proposal.timeline,
+
+      generated_by: "AI-drafted",
+
+      status: scriptResponse.proposal.status,
+    },
+  });
+
+  /**
+   * Step 2:
+   * Persist the quotation.
+   */
+  const savedQuote = await apiRequest("/quotes", {
+    method: "POST",
+    body: {
+      proposal_id: savedProposal.proposal_id,
+
+      user_id: body.userId,
+
+      currency: scriptResponse.quote.currency ?? "KES",
+
+      tax_rate: 16,
+
+      discount_amount: 0,
+
+      total_amount: scriptResponse.quote.total,
+
+      validity_days: 30,
+
+      status: scriptResponse.quote.status,
+
+      line_items: scriptResponse.quote.line_items,
+    },
+  });
+
+  /**
+   * Step 3:
+   * Return the persisted entities together with the proposal HTML.
+   */
+  return {
+    success: true,
+
+    proposal: {
+      ...savedProposal,
+      proposal_html: scriptResponse.proposal_html,
+    },
+
+    quotation: savedQuote,
+  };
+}
