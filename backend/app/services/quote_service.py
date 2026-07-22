@@ -1,6 +1,12 @@
 from sqlalchemy import desc
 
+from app.extensions import db
 from app.models.quote import Quote
+from app.exceptions import (
+    DatabaseError,
+    ResourceNotFound,
+    ValidationError,
+)
 
 
 class QuoteService:
@@ -115,5 +121,66 @@ class QuoteService:
 
         db.session.add(quote)
         db.session.commit()
+
+        return quote.to_dict()
+
+    @staticmethod
+    def update_quote(quote_id, data):
+        """
+        PATCH /api/quotes/<id>
+
+        line_items also recomputes total_amount so a manager's pricing
+        edit stays consistent with what actually gets quoted.
+        """
+
+        if not data:
+            raise ValidationError(
+                "Request body is required"
+            )
+
+        quote = Quote.query.get(quote_id)
+
+        if quote is None:
+            raise ResourceNotFound("Quote not found")
+
+        if "line_items" in data:
+            items = []
+            for item in data["line_items"]:
+                item = dict(item)
+                item.setdefault("qty", 1)
+                item.setdefault("unit_price", 0)
+                item["amount"] = item.get("amount") or round(
+                    item["qty"] * item["unit_price"], 2
+                )
+                items.append(item)
+
+            quote.line_items = items
+            quote.total_amount = round(
+                sum(item["amount"] for item in items), 2
+            )
+
+        if "currency" in data:
+            quote.currency = data["currency"][:5]
+
+        if "tax_rate" in data:
+            quote.tax_rate = data["tax_rate"]
+
+        if "discount_amount" in data:
+            quote.discount_amount = data["discount_amount"]
+
+        if "validity_days" in data:
+            quote.validity_days = data["validity_days"]
+
+        if "status" in data:
+            quote.status = data["status"]
+
+        try:
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+
+            raise DatabaseError(
+                "Unable to update quote."
+            )
 
         return quote.to_dict()

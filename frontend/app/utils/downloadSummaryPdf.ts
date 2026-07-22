@@ -6,6 +6,7 @@ import {
 
 export async function downloadSummaryPdf(summary: any) {
   const meeting = summary.first_meeting_deliverables;
+  const kp = meeting?.key_points ?? {};
 
   const pdf = await PDFDocument.create();
 
@@ -88,135 +89,124 @@ export async function downloadSummaryPdf(summary: any) {
   // ------------------------------------
 
   heading("Meeting");
-
-  body(`Title: ${meeting.title}`);
-  body(`Type: ${meeting.meeting_type}`);
-
+  body(`Title: ${meeting?.title || "—"}`);
+  body(`Type: ${meeting?.meeting_type || "—"}`);
   y -= 8;
 
   // ------------------------------------
-  // Client
+  // Client (only if extracted)
   // ------------------------------------
 
-  heading("Client");
-
-  body(
-    `Company: ${meeting.key_points.client.company}`,
-  );
-
-  body(
-    `Contact: ${meeting.key_points.client.primary_contact}`,
-  );
-
-  y -= 8;
+  if (kp.client) {
+    heading("Client");
+    body(`Company: ${kp.client.company || "—"}`);
+    body(`Contact: ${kp.client.primary_contact || "—"}`);
+    y -= 8;
+  }
 
   // ------------------------------------
-  // Project
+  // Project (only if extracted)
   // ------------------------------------
 
-  heading("Project");
-
-  body(
-    `Name: ${meeting.key_points.project.name}`,
-  );
-
-  body(
-    `Type: ${meeting.key_points.project.type}`,
-  );
-
-  body(
-    `Objective: ${meeting.key_points.project.objective}`,
-  );
-
-  y -= 8;
+  if (kp.project) {
+    heading("Project");
+    body(`Name: ${kp.project.name || "—"}`);
+    body(`Type: ${kp.project.type || "—"}`);
+    body(`Objective: ${kp.project.objective || "—"}`);
+    y -= 8;
+  }
 
   // ------------------------------------
-  // Deliverables
+  // Deliverables (only if extracted)
   // ------------------------------------
 
-  heading("Deliverables");
-
-  meeting.key_points.deliverables.forEach((item: any) => {
-    bullet(
-      `${item.name}${
-        item.duration ? ` (${item.duration})` : ""
-      }`,
-    );
-  });
-
-  y -= 8;
+  if (kp.deliverables?.length) {
+    heading("Deliverables");
+    kp.deliverables.forEach((item: any) => {
+      bullet(`${item.name}${item.duration ? ` (${item.duration})` : ""}`);
+    });
+    y -= 8;
+  }
 
   // ------------------------------------
-  // Timeline
+  // Timeline (only if extracted)
   // ------------------------------------
 
-  heading("Timeline");
-
-  body(
-    `Hackathon Ends: ${meeting.key_points.timeline.hackathon_end}`,
-  );
-
-  body(
-    `Summary Video: ${meeting.key_points.timeline.summary_video_genesis_quote}`,
-  );
-
-  body(
-    `Social Clips: ${meeting.key_points.timeline.social_clips_genesis_quote}`,
-  );
-
-  y -= 8;
+  if (kp.timeline) {
+    heading("Timeline");
+    if (kp.timeline.hackathon_end) body(`Hackathon Ends: ${kp.timeline.hackathon_end}`);
+    if (kp.timeline.summary_video_genesis_quote)
+      body(`Summary Video: ${kp.timeline.summary_video_genesis_quote}`);
+    if (kp.timeline.social_clips_genesis_quote)
+      body(`Social Clips: ${kp.timeline.social_clips_genesis_quote}`);
+    y -= 8;
+  }
 
   // ------------------------------------
-  // Creative Direction
+  // Creative Direction (only if extracted)
   // ------------------------------------
 
-  heading("Creative Direction");
-
-  body(
-    meeting.key_points.creative_direction.description,
-  );
-
-  meeting.key_points.creative_direction.messaging_themes.forEach(
-    (theme: string) => bullet(theme),
-  );
-
-  y -= 8;
+  if (kp.creative_direction) {
+    heading("Creative Direction");
+    if (kp.creative_direction.description) body(kp.creative_direction.description);
+    (kp.creative_direction.messaging_themes ?? []).forEach((theme: string) => bullet(theme));
+    y -= 8;
+  }
 
   // ------------------------------------
-  // Next Steps
+  // Next Steps (only if extracted)
   // ------------------------------------
 
-  heading("Genesis Next Steps");
+  if (kp.next_steps?.genesis?.length) {
+    heading("Genesis Next Steps");
+    kp.next_steps.genesis.forEach((step: string) => bullet(step));
+    y -= 8;
+  }
 
-  meeting.key_points.next_steps.genesis.forEach(
-    (step: string) => bullet(step),
-  );
+  if (kp.next_steps?.client?.length) {
+    heading("Client Next Steps");
+    kp.next_steps.client.forEach((step: string) => bullet(step));
+    y -= 12;
+  }
 
-  y -= 8;
+  // ------------------------------------
+  // Budget (only if extracted)
+  // ------------------------------------
 
-  heading("Client Next Steps");
+  if (kp.budget) {
+    heading("Budget");
+    body(kp.budget.status || "Not yet established.");
+    y -= 8;
+  }
 
-  meeting.key_points.next_steps.client.forEach(
-    (step: string) => bullet(step),
-  );
+  // ------------------------------------
+  // Competition (only if extracted)
+  // ------------------------------------
 
-  y -= 12;
+  if (kp.competition) {
+    heading("Competition");
+    if (kp.competition.other_agencies)
+      body(`Other Agencies: ${kp.competition.other_agencies}`);
+    if (kp.competition.selection_method)
+      body(`Selection: ${kp.competition.selection_method}`);
+  }
 
-  heading("Budget");
+  // ------------------------------------
+  // Fallback — a plain transcript that only yielded participants/action
+  // items, not a full structured extraction.
+  // ------------------------------------
 
-  body(meeting.key_points.budget.status);
-
-  y -= 8;
-
-  heading("Competition");
-
-  body(
-    `Other Agencies: ${meeting.key_points.competition.other_agencies}`,
-  );
-
-  body(
-    `Selection: ${meeting.key_points.competition.selection_method}`,
-  );
+  if (!kp.client && !kp.project && !kp.deliverables?.length && !kp.timeline && !kp.budget) {
+    if (kp.participants?.length) {
+      heading("Participants");
+      body(kp.participants.join(", "));
+      y -= 8;
+    }
+    if (kp.action_items?.length) {
+      heading("Action Items");
+      kp.action_items.forEach((item: string) => bullet(item));
+    }
+  }
 
   // ------------------------------------
   // Footer
@@ -238,7 +228,7 @@ export async function downloadSummaryPdf(summary: any) {
 
   const bytes = await pdf.save();
 
-  const blob = new Blob([bytes], {
+  const blob = new Blob([bytes as BlobPart], {
     type: "application/pdf",
   });
 
@@ -248,7 +238,7 @@ export async function downloadSummaryPdf(summary: any) {
 
   link.href = url;
 
-  link.download = `${meeting.title.replace(/\s+/g, "_")}_summary.pdf`;
+  link.download = `${(meeting?.title || "summary").replace(/\s+/g, "_")}_summary.pdf`;
 
   link.click();
 

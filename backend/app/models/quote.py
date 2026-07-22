@@ -133,6 +133,21 @@ class Quote(db.Model):
                 else None
             ),
 
+            # Aliases for the Kora-agent quote shape (renderer.py's
+            # _defaults_for_quote) so the frontend doesn't need two
+            # different field names depending on which backend served the
+            # quote. Not a new column — subtotal is summed from line_items
+            # (each already carries a computed "amount") once here instead
+            # of every page that displays a quote re-deriving it.
+            "total": (
+                float(self.total_amount)
+                if self.total_amount is not None
+                else None
+            ),
+            "subtotal": sum(
+                (item.get("amount") or 0) for item in (self.line_items or [])
+            ),
+
             "validity_days": self.validity_days,
 
             "status": self.status,

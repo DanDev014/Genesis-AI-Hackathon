@@ -1,5 +1,5 @@
 <template>
-  <main class="mx-auto h-screen overflow-y-auto p-6">
+  <main class="mx-auto h-screen p-6">
     <div>
       <p class="text-sm font-medium text-primary">Kora AI workspace</p>
       <h1 class="mt-1 text-xl font-semibold tracking-tight text-neutral-950">
@@ -125,9 +125,6 @@
             </div>
           </div></UCard
         >
-        <UButton @click="proposalModalOpen = true">
-          Open Proposal Modal
-        </UButton>
       </aside>
     </div>
   </main>
@@ -142,6 +139,8 @@
     v-model="proposalModalOpen"
     :proposal="generatedProposal"
     :quotation="generatedQuotation"
+    @update:proposal="generatedProposal = $event"
+    @update:quotation="generatedQuotation = $event"
   />
 </template>
 

@@ -344,6 +344,17 @@ def _key_points_from_transcript(meeting_type: str, participants: list,
     return key_points
 
 
+def _key_points_is_thin(key_points: Optional[dict]) -> bool:
+    """True if key_points has no real signal beyond the bookkeeping
+    meeting_type field — the shape a transient extraction failure falls
+    back to. Used so a dedup hit doesn't trap every future retry behind
+    one bad first attempt forever."""
+    if not key_points:
+        return True
+    meaningful = {k: v for k, v in key_points.items() if k != "meeting_type"}
+    return not any(meaningful.values())
+
+
 def save_capture(source: str, summary: str, title: str = "",
                  external_id: str = "", raw: Optional[dict] = None,
                  meeting_type_hint: str = "", extra_action_items: Optional[list] = None) -> dict:
@@ -367,12 +378,17 @@ def save_capture(source: str, summary: str, title: str = "",
             existing = json.loads((CAPTURES_DIR / existing_name).read_text(encoding="utf-8"))
         except Exception:
             pass
-        return _log("dedup", existing_name, {
-            "fingerprint": fp,
-            "title": existing.get("title", ""),
-            "meeting_type": existing.get("meeting_type", ""),
-            "key_points": existing.get("key_points", {}),
-        })
+        if not _key_points_is_thin(existing.get("key_points")):
+            return _log("dedup", existing_name, {
+                "fingerprint": fp,
+                "title": existing.get("title", ""),
+                "meeting_type": existing.get("meeting_type", ""),
+                "key_points": existing.get("key_points", {}),
+            })
+        # The cached capture came from a transient extraction failure (e.g.
+        # a one-off LLM hiccup) that fell back to an empty result. Don't
+        # trap every future retry with identical content behind that bad
+        # first attempt — fall through and reprocess as if this were new.
 
     CAPTURES_DIR.mkdir(parents=True, exist_ok=True)
     stamp = datetime.utcnow().strftime("%Y%m%d-%H%M%S")

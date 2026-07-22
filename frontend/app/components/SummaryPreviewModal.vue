@@ -53,37 +53,42 @@ const meeting = computed(
           </div>
 
           <!-- Client -->
-          <div>
+          <div v-if="meeting.key_points?.client">
             <h4 class="mb-2 font-medium">Client</h4>
 
             <p>
-              {{ meeting.key_points.client.company }}
+              {{ meeting.key_points.client.company || "—" }}
             </p>
 
             <p class="text-sm text-muted">
-              {{ meeting.key_points.client.primary_contact }}
+              {{ meeting.key_points.client.primary_contact || "" }}
             </p>
           </div>
 
           <!-- Project -->
-          <div>
+          <div v-if="meeting.key_points?.project">
             <h4 class="mb-2 font-medium">Project</h4>
 
             <p class="font-medium">
-              {{ meeting.key_points.project.name }}
+              {{ meeting.key_points.project.name || "—" }}
             </p>
 
             <p class="text-sm text-muted">
-              {{ meeting.key_points.project.objective }}
+              {{ meeting.key_points.project.objective || "" }}
             </p>
 
-            <UBadge color="neutral" variant="soft" class="mt-2">
+            <UBadge
+              v-if="meeting.key_points.project.type"
+              color="neutral"
+              variant="soft"
+              class="mt-2"
+            >
               {{ meeting.key_points.project.type }}
             </UBadge>
           </div>
 
           <!-- Target Audience -->
-          <div>
+          <div v-if="meeting.key_points?.target_audience?.length">
             <h4 class="mb-2 font-medium">Target Audience</h4>
 
             <ul class="list-disc space-y-1 pl-5">
@@ -99,7 +104,7 @@ const meeting = computed(
           </div>
 
           <!-- Deliverables -->
-          <div>
+          <div v-if="meeting.key_points?.deliverables?.length">
             <h4 class="mb-2 font-medium">Deliverables</h4>
 
             <ul class="list-disc space-y-1 pl-5">
@@ -125,17 +130,17 @@ const meeting = computed(
           </div>
 
           <!-- Creative Direction -->
-          <div>
+          <div v-if="meeting.key_points?.creative_direction">
             <h4 class="mb-2 font-medium">Creative Direction</h4>
 
-            <p class="mb-2 text-sm">
+            <p v-if="meeting.key_points.creative_direction.description" class="mb-2 text-sm">
               {{ meeting.key_points.creative_direction.description }}
             </p>
 
             <ul class="list-disc space-y-1 pl-5">
               <li
                 v-for="theme in meeting.key_points.creative_direction
-                  .messaging_themes"
+                  .messaging_themes ?? []"
                 :key="theme"
               >
                 {{ theme }}
@@ -144,21 +149,21 @@ const meeting = computed(
           </div>
 
           <!-- Timeline -->
-          <div>
+          <div v-if="meeting.key_points?.timeline">
             <h4 class="mb-2 font-medium">Timeline</h4>
 
             <ul class="space-y-1 text-sm">
-              <li>
+              <li v-if="meeting.key_points.timeline.hackathon_end">
                 <strong>Hackathon Ends:</strong>
                 {{ meeting.key_points.timeline.hackathon_end }}
               </li>
 
-              <li>
+              <li v-if="meeting.key_points.timeline.summary_video_genesis_quote">
                 <strong>Summary Video:</strong>
                 {{ meeting.key_points.timeline.summary_video_genesis_quote }}
               </li>
 
-              <li>
+              <li v-if="meeting.key_points.timeline.social_clips_genesis_quote">
                 <strong>Social Clips:</strong>
                 {{ meeting.key_points.timeline.social_clips_genesis_quote }}
               </li>
@@ -166,35 +171,35 @@ const meeting = computed(
           </div>
 
           <!-- Budget -->
-          <div>
+          <div v-if="meeting.key_points?.budget">
             <h4 class="mb-2 font-medium">Budget</h4>
 
             <p>
-              {{ meeting.key_points.budget.status }}
+              {{ meeting.key_points.budget.status || "Not yet established." }}
             </p>
           </div>
 
           <!-- Competition -->
-          <div>
+          <div v-if="meeting.key_points?.competition">
             <h4 class="mb-2 font-medium">Competition</h4>
 
-            <p>
+            <p v-if="meeting.key_points.competition.other_agencies">
               Other agencies:
               {{ meeting.key_points.competition.other_agencies }}
             </p>
 
-            <p>
+            <p v-if="meeting.key_points.competition.selection_method">
               Selection:
               {{ meeting.key_points.competition.selection_method }}
             </p>
           </div>
 
           <!-- Next Steps -->
-          <div>
+          <div v-if="meeting.key_points?.next_steps">
             <h4 class="mb-2 font-medium">Next Steps</h4>
 
             <div class="grid gap-4 md:grid-cols-2">
-              <div>
+              <div v-if="meeting.key_points.next_steps.genesis?.length">
                 <h5 class="mb-2 font-medium">Genesis</h5>
 
                 <ul class="list-disc space-y-1 pl-5">
@@ -207,7 +212,7 @@ const meeting = computed(
                 </ul>
               </div>
 
-              <div>
+              <div v-if="meeting.key_points.next_steps.client?.length">
                 <h5 class="mb-2 font-medium">Client</h5>
 
                 <ul class="list-disc space-y-1 pl-5">
@@ -220,6 +225,47 @@ const meeting = computed(
                 </ul>
               </div>
             </div>
+          </div>
+
+          <!-- Fallback when key_points has none of the structured sections
+               above (e.g. a plain transcript that only yielded
+               participants/action_items, not a full structured extraction) -->
+          <div
+            v-if="
+              !meeting.key_points?.client &&
+              !meeting.key_points?.project &&
+              !meeting.key_points?.deliverables?.length &&
+              !meeting.key_points?.timeline &&
+              !meeting.key_points?.budget &&
+              !meeting.key_points?.next_steps
+            "
+            class="space-y-4"
+          >
+            <div v-if="meeting.key_points?.participants?.length">
+              <h4 class="mb-2 font-medium">Participants</h4>
+              <p class="text-sm text-muted">
+                {{ meeting.key_points.participants.join(", ") }}
+              </p>
+            </div>
+
+            <div v-if="meeting.key_points?.action_items?.length">
+              <h4 class="mb-2 font-medium">Action Items</h4>
+              <ul class="list-disc space-y-1 pl-5">
+                <li v-for="item in meeting.key_points.action_items" :key="item">
+                  {{ item }}
+                </li>
+              </ul>
+            </div>
+
+            <p
+              v-if="
+                !meeting.key_points?.participants?.length &&
+                !meeting.key_points?.action_items?.length
+              "
+              class="text-sm text-muted"
+            >
+              No structured details were extracted from this transcript.
+            </p>
           </div>
         </div>
 

@@ -190,8 +190,16 @@ async function handleInternalMeeting({
   /**
    * Step 1:
    * Persist the proposal.
+   *
+   * Flask wraps every create response as {success, message, data}, not the
+   * bare record — unwrap it here so the rest of this function (and the
+   * frontend modal) always deals with a flat proposal object.
    */
-  const savedProposal = await apiRequest("/proposals", {
+  const proposalResponse = await apiRequest<{
+    success: boolean;
+    message: string;
+    data: Record<string, any>;
+  }>("/proposals", {
     method: "POST",
     body: {
       client_id: body.clientId,
@@ -208,12 +216,17 @@ async function handleInternalMeeting({
       status: scriptResponse.proposal.status,
     },
   });
+  const savedProposal = proposalResponse.data;
 
   /**
    * Step 2:
-   * Persist the quotation.
+   * Persist the quotation. Same unwrapping applies.
    */
-  const savedQuote = await apiRequest("/quotes", {
+  const quoteResponse = await apiRequest<{
+    success: boolean;
+    message: string;
+    data: Record<string, any>;
+  }>("/quotes", {
     method: "POST",
     body: {
       proposal_id: savedProposal.proposal_id,
@@ -235,6 +248,7 @@ async function handleInternalMeeting({
       line_items: scriptResponse.quote.line_items,
     },
   });
+  const savedQuote = quoteResponse.data;
 
   /**
    * Step 3:

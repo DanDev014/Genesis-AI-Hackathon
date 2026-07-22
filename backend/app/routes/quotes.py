@@ -59,3 +59,20 @@ def create_quote():
         "message": "Quote created successfully",
         "data": quote,
     }), 201
+
+
+@quotes_bp.patch("/quotes/<int:quote_id>")
+def update_quote(quote_id):
+    """
+    PATCH /api/quotes/<id>
+    """
+
+    quote = QuoteService.update_quote(
+        quote_id, request.get_json(silent=True)
+    )
+
+    return jsonify({
+        "success": True,
+        "message": "Quote updated successfully",
+        "data": quote,
+    }), 200

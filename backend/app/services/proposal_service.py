@@ -2,6 +2,11 @@ from sqlalchemy import asc, desc
 
 from app.models.proposal import Proposal
 from app.extensions import db
+from app.exceptions import (
+    DatabaseError,
+    ResourceNotFound,
+    ValidationError,
+)
 
 class ProposalService:
 
@@ -110,5 +115,50 @@ class ProposalService:
 
         db.session.add(proposal)
         db.session.commit()
+
+        return proposal.to_dict()
+
+    @staticmethod
+    def update_proposal(proposal_id, data):
+        """
+        PATCH /api/proposals/<id>
+
+        Lets a manager revise a draft before approving it. Only touches
+        fields actually present in the body — a PATCH, not a full replace.
+        """
+
+        if not data:
+            raise ValidationError(
+                "Request body is required"
+            )
+
+        proposal = Proposal.query.get(proposal_id)
+
+        if proposal is None:
+            raise ResourceNotFound("Proposal not found")
+
+        if "scope_of_work" in data:
+            proposal.scope_of_work = data["scope_of_work"]
+
+        if "deliverables_list" in data:
+            proposal.deliverables_list = data["deliverables_list"]
+
+        if "timeline_milestones" in data:
+            proposal.timeline_milestones = data["timeline_milestones"]
+
+        if "status" in data:
+            proposal.status = data["status"]
+
+        if "version" in data:
+            proposal.version = data["version"]
+
+        try:
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+
+            raise DatabaseError(
+                "Unable to update proposal."
+            )
 
         return proposal.to_dict()

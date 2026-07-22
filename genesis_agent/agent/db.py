@@ -73,6 +73,10 @@ def init() -> None:
             conninfo=DATABASE_URL,
             min_size=1, max_size=4,
             open=True, kwargs={"autocommit": True},
+            # Neon drops idle connections; without this, a stale pooled
+            # connection gets handed out, the query fails, and every write
+            # silently falls back to file storage for that request.
+            check=ConnectionPool.check_connection,
         )
         with _pool.connection() as conn, conn.cursor() as cur:
             cur.execute("select 1")

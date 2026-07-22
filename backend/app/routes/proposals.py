@@ -52,3 +52,20 @@ def create_proposal():
         "message": "Proposal created successfully",
         "data": proposal,
     }), 201
+
+
+@proposals_bp.patch("/proposals/<int:proposal_id>")
+def update_proposal(proposal_id):
+    """
+    PATCH /api/proposals/<id>
+    """
+
+    proposal = ProposalService.update_proposal(
+        proposal_id, request.get_json(silent=True)
+    )
+
+    return jsonify({
+        "success": True,
+        "message": "Proposal updated successfully",
+        "data": proposal,
+    }), 200
