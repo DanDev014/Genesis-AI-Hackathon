@@ -1,5 +1,12 @@
 from sqlalchemy import asc, desc, or_
 
+from app.extensions import db
+from app.exceptions import (
+    ConflictError,
+    DatabaseError,
+    ResourceNotFound,
+    ValidationError,
+)
 from app.models.client import Client
 
 
@@ -7,6 +14,10 @@ class ClientService:
 
     @staticmethod
     def list_clients(params):
+        """
+        GET /api/clients
+        """
+
         query = Client.query
 
         # ------------------------
@@ -26,11 +37,15 @@ class ClientService:
         # ------------------------
         status = params.get("status")
         if status:
-            query = query.filter(Client.status == status)
+            query = query.filter(
+                Client.status == status
+            )
 
         industry = params.get("industry")
         if industry:
-            query = query.filter(Client.industry == industry)
+            query = query.filter(
+                Client.industry == industry
+            )
 
         manager_id = params.get("manager_id")
         if manager_id:
@@ -41,20 +56,44 @@ class ClientService:
         # ------------------------
         # Sorting
         # ------------------------
-        sort = params.get("sort", "-created_at")
+        sort = params.get(
+            "sort",
+            "-created_at",
+        )
 
         if sort.startswith("-"):
-            column = getattr(Client, sort[1:], Client.created_at)
-            query = query.order_by(desc(column))
+            column = getattr(
+                Client,
+                sort[1:],
+                Client.created_at,
+            )
+            query = query.order_by(
+                desc(column)
+            )
         else:
-            column = getattr(Client, sort, Client.created_at)
-            query = query.order_by(asc(column))
+            column = getattr(
+                Client,
+                sort,
+                Client.created_at,
+            )
+            query = query.order_by(
+                asc(column)
+            )
 
         # ------------------------
         # Pagination
         # ------------------------
-        page = int(params.get("page", 1))
-        limit = int(params.get("limit", 20))
+        try:
+            page = int(
+                params.get("page", 1)
+            )
+            limit = int(
+                params.get("limit", 20)
+            )
+        except ValueError:
+            raise ValidationError(
+                "page and limit must be integers."
+            )
 
         pagination = query.paginate(
             page=page,
@@ -63,13 +102,14 @@ class ClientService:
         )
 
         return {
+            "success": True,
             "data": [
                 client.to_dict()
                 for client in pagination.items
             ],
             "meta": {
-                "page": page,
-                "limit": limit,
+                "page": pagination.page,
+                "limit": pagination.per_page,
                 "total": pagination.total,
                 "pages": pagination.pages,
             },
@@ -77,33 +117,97 @@ class ClientService:
 
     @staticmethod
     def get_client(client_id):
-        client = Client.query.get(client_id)
+        """
+        GET /api/clients/<id>
+        """
 
-        if not client:
-            return None
+        client = db.session.get(
+            Client,
+            client_id,
+        )
 
-        return client.to_dict()
+        if client is None:
+            raise ResourceNotFound(
+                "Client not found."
+            )
+
+        return {
+            "success": True,
+            "data": client.to_dict(),
+        }
 
     @staticmethod
     def create_client(data):
+        """
+        POST /api/clients
+        """
 
-        client = Client(
-            user_id=data["user_id"],
-            name=data["name"],
-            company=data["company"],
-            industry=data["industry"],
-            phone=data.get("phone"),
-            email=data["email"],
-            source=data.get("source"),
-            status=data.get("status", "lead"),
-            assigned_account_manager=data.get(
-                "assigned_account_manager"
-            ),
-        )
+        if not data:
+            raise ValidationError(
+                "Request body is required."
+            )
 
-        from app.extensions import db
+        required_fields = [
+            "user_id",
+            "name",
+            "company",
+            "industry",
+            "email",
+        ]
 
-        db.session.add(client)
-        db.session.commit()
+        for field in required_fields:
+            value = data.get(field)
 
-        return client.to_dict()
+            if value is None or (
+                isinstance(value, str)
+                and not value.strip()
+            ):
+                raise ValidationError(
+                    f"{field} is required."
+                )
+
+        existing_client = Client.query.filter_by(
+            email=data["email"]
+        ).first()
+
+        if existing_client:
+            raise ConflictError(
+                "A client with this email already exists."
+            )
+
+        try:
+
+            client = Client(
+                user_id=data["user_id"],
+                name=data["name"],
+                company=data["company"],
+                industry=data["industry"],
+                phone=data.get("phone"),
+                email=data["email"],
+                source=data.get("source"),
+                status=data.get(
+                    "status",
+                    "lead",
+                ),
+                assigned_account_manager=data.get(
+                    "assigned_account_manager"
+                ),
+            )
+
+            db.session.add(client)
+            db.session.commit()
+
+            return {
+                "success": True,
+                "message": (
+                    "Client created successfully."
+                ),
+                "data": client.to_dict(),
+            }
+
+        except Exception:
+            db.session.rollback()
+
+            raise DatabaseError(
+                "Unable to create client."
+            )
