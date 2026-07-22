@@ -16,6 +16,7 @@
     "@nuxt/ui": "^4.10.0",
     "@pinia/nuxt": "1.0.1",
     "nuxt": "^4.4.8",
+    "pdf-lib": "^1.17.1",
     "pinia": "^4.0.2",
     "tailwindcss": "^4.3.2",
     "valibot": "^1.4.2"

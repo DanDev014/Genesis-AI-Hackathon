@@ -37,40 +37,66 @@
       Couldn't load clients. Please try again.
     </p>
 
-    <DataTable
-      :columns="columns"
-      :rows="rows"
-      :loading="pending"
-      row-key="client_id"
-      ><template #cell-client="{ row }"
-        ><div>
-          <p class="font-medium text-neutral-900">{{ row.name }}</p>
-          <p class="text-xs text-neutral-500">{{ row.industry }}</p>
-        </div></template
-      ><template #cell-status="{ row }"
-        ><UBadge
-          :color="
-            row.status === 'Active'
-              ? 'success'
-              : row.status === 'Proposal sent'
-                ? 'warning'
-                : 'neutral'
-          "
-          variant="subtle"
-          >{{ row.status || "Unknown" }}</UBadge
-        ></template
-      ><template #cell-owner="{ row }">{{ row.owner }}</template
-      ><template #cell-lastMeeting="{ row }">{{ row.lastMeeting }}</template
-      ><template #cell-action="{ row }"
-        ><UButton
-          :to="`/clients/${row.client_id}`"
-          color="neutral"
-          variant="outline"
-          size="xs"
-          >View client</UButton
-        ></template
-      ></DataTable
-    >
+    <!-- Initial load: no data yet -->
+    <div v-if="pending && !data" class="space-y-2 rounded-lg border border-neutral-200 bg-white p-4">
+      <div
+        v-for="i in 8"
+        :key="i"
+        class="flex items-center gap-4 py-2"
+      >
+        <USkeleton class="h-4 w-1/5 bg-neutral-200" />
+        <USkeleton class="h-4 w-1/6 bg-neutral-200" />
+        <USkeleton class="h-4 w-20 bg-neutral-200" />
+        <USkeleton class="h-4 w-1/6 bg-neutral-200" />
+        <USkeleton class="h-4 w-24 bg-neutral-200" />
+        <USkeleton class="h-6 w-20 ml-auto bg-neutral-200" />
+      </div>
+    </div>
+
+    <!-- Loaded (or refetching): show table, dim + spinner while refetching -->
+    <div v-else class="relative">
+      <div
+        v-if="pending"
+        class="absolute inset-0 z-10 flex items-center justify-center gap-2 rounded-lg bg-white/70 text-sm text-neutral-500"
+      >
+        <UIcon name="i-lucide-loader-2" class="size-4 animate-spin" />
+        Loading clients...
+      </div>
+      <DataTable
+        :columns="columns"
+        :rows="rows"
+        row-key="client_id"
+        :class="{ 'opacity-50': pending }"
+        ><template #cell-client="{ row }"
+          ><div>
+            <p class="font-medium text-neutral-900">{{ row.name }}</p>
+            <p class="text-xs text-neutral-500">{{ row.industry }}</p>
+          </div></template
+        ><template #cell-status="{ row }"
+          ><UBadge
+            :color="
+              row.status === 'Active'
+                ? 'success'
+                : row.status === 'Proposal sent'
+                  ? 'warning'
+                  : 'neutral'
+            "
+            variant="subtle"
+            >{{ row.status || "Unknown" }}</UBadge
+          ></template
+        ><template #cell-owner="{ row }">{{ row.owner }}</template
+        ><template #cell-lastMeeting="{ row }">{{ row.lastMeeting }}</template
+        ><template #cell-action="{ row }"
+          ><UButton
+            :to="`/clients/${row.client_id}`"
+            color="neutral"
+            variant="outline"
+            size="xs"
+            >View client</UButton
+          ></template
+        ></DataTable
+      >
+    </div>
 
     <div class="flex flex-col items-center justify-between gap-3 sm:flex-row">
       <p class="text-sm text-neutral-500">
@@ -108,6 +134,7 @@ const debouncedSearch = ref("");
 const status = ref("All statuses");
 const page = ref(1);
 const limit = ref(20);
+
 const statuses = [
   "All statuses",
   "Active",

@@ -81,12 +81,15 @@
             :loading="loading"
             class="bg-primary font-semibold text-white hover:bg-yellow-400"
             icon="i-lucide-sparkles"
-            >{{
-              state.meetingType === "internal"
-                ? "Generate proposal + quotation"
-                : "Generate client summary"
-            }}</UButton
           >
+            {{
+              loading
+                ? "Generating..."
+                : state.meetingType === "internal"
+                  ? "Generate proposal + quotation"
+                  : "Generate client summary"
+            }}
+          </UButton>
         </UForm>
       </UCard>
       <aside class="space-y-4">
@@ -136,11 +139,15 @@
 
 <script setup lang="ts">
 import * as v from "valibot";
+import { downloadSummaryPdf } from "~/utils/downloadSummaryPdf";
 
 const loading = ref(false);
 
 const summaryModalOpen = ref(false);
 const generatedSummary = ref(null);
+
+const authStore = useAuthStore();
+const toast = useToast();
 
 const meetingTypes = [
   {
@@ -159,6 +166,11 @@ const {
   error,
 } = await useLazyFetch("/api/clients");
 
+const resetForm = () => {
+  state.clientId = undefined;
+  state.meetingType = "";
+  state.transcript = "";
+};
 const clients = computed(() =>
   (clientsResponse.value?.data ?? []).map((client) => ({
     label: `${client.company} (${client.name})`,
@@ -189,21 +201,48 @@ async function onSubmit(event: { data: Schema }) {
   try {
     const response = await $fetch("/api/agent/fathom", {
       method: "POST",
-      body: event.data,
+      body: {
+        transcript: state.transcript,
+        meetingType: state.meetingType,
+        clientId: state.clientId,
+        userId: authStore.user?.user_id,
+      },
     });
 
     console.log(response);
-    generatedSummary.value = response.summary.capture;
-    summaryModalOpen.value = true;
+    if (response.success) {
+      generatedSummary.value = response.data;
+      summaryModalOpen.value = true;
+    }
   } catch (error) {
     console.error("Error processing transcript", error);
+    const message =
+      error?.data?.message ??
+      error?.data?.error ??
+      error?.message ??
+      "Something went wrong. Please try again.";
+
+    toast.add({
+      title: "Generation failed",
+      description: message,
+      color: "error",
+      icon: "i-lucide-circle-alert",
+    });
   } finally {
     loading.value = false;
   }
 }
 
 const downloadSummary = async () => {
-  console.log("Download Summary", generatedSummary.value);
+  if (!generatedSummary.value) {
+    return;
+  }
+
+  try {
+    await downloadSummaryPdf(generatedSummary.value);
+  } catch (error) {
+    console.error("Failed to generate PDF", error);
+  }
 };
 
 const viewSummary = async () => {
