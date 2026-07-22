@@ -15,6 +15,12 @@ class Summary(db.Model):
         nullable=False,
     )
 
+    user_id = db.Column(
+        db.Integer,
+        db.ForeignKey("users.user_id"),
+        nullable=False,
+    )
+
     first_meeting_deliverables = db.Column(
         db.JSON,
         nullable=True,
@@ -34,15 +40,15 @@ class Summary(db.Model):
     # Relationships
     # ======================================
 
-    # user = db.relationship(
-    #     "User",
-    #     back_populates="summaries",
-    # )
+    user = db.relationship(
+        "User",
+        back_populates="summaries",
+    )
 
-    # client = db.relationship(
-    #     "Client",
-    #     back_populates="summaries",
-    # )
+    client = db.relationship(
+        "Client",
+        back_populates="summaries",
+    )
 
     # ======================================
     # Serialization

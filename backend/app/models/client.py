@@ -52,6 +52,11 @@ class Client(db.Model):
         db.String(30),
     )
 
+    summaries = db.relationship(
+    "Summary",
+    back_populates="client",
+)
+
     assigned_account_manager = db.Column(
         db.Integer,
         db.ForeignKey(

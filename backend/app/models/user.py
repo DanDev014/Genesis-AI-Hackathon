@@ -71,7 +71,12 @@ class User(db.Model):
         back_populates="created_by",
         foreign_keys="Quote.created_by_user_id",
     )
-
+    
+    summaries = db.relationship(
+    "Summary",
+    back_populates="user",
+    lazy=True,
+)
     # ==========================
     # Password Helpers
     # ==========================
