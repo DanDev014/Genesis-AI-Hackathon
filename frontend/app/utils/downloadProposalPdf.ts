@@ -20,6 +20,13 @@ async function downloadRenderedProposalTemplate(proposal: any) {
       iframe.srcdoc = proposal.proposal_html;
     });
 
+    // `onload` only guarantees the iframe's DOM has parsed, not that layout/paint
+    // has settled — give the browser two frames before handing it to html2canvas,
+    // otherwise the capture can come back blank.
+    await new Promise<void>((resolve) => {
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+    });
+
     const target = iframe.contentDocument?.body;
     if (!target) return false;
 
@@ -29,7 +36,6 @@ async function downloadRenderedProposalTemplate(proposal: any) {
         filename: `proposal_${proposal.proposal_id}.pdf`,
         html2canvas: { scale: 2, useCORS: true, windowWidth: A4_WIDTH_PX },
         jsPDF: { unit: "pt", format: "a4", orientation: "portrait" },
-        pagebreak: { mode: ["css", "legacy"] },
       })
       .from(target)
       .save();

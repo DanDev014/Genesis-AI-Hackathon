@@ -169,6 +169,36 @@ class Quote(db.Model):
             ),
         }
 
+    def to_public_dict(self):
+        """Safe subset served by the unauthenticated /p/<token> page — no
+        internal user id, no nested proposal/client (the page already has
+        the proposal it belongs to)."""
+        return {
+            "quote_id": self.quote_id,
+            "currency": self.currency,
+            "tax_rate": (
+                float(self.tax_rate)
+                if self.tax_rate is not None
+                else None
+            ),
+            "discount_amount": (
+                float(self.discount_amount)
+                if self.discount_amount is not None
+                else None
+            ),
+            "total": (
+                float(self.total_amount)
+                if self.total_amount is not None
+                else None
+            ),
+            "subtotal": sum(
+                (item.get("amount") or 0) for item in (self.line_items or [])
+            ),
+            "validity_days": self.validity_days,
+            "status": self.status,
+            "line_items": self.line_items,
+        }
+
     def __repr__(self):
         return (
             f"<Quote {self.quote_id} | "

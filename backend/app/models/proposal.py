@@ -76,6 +76,20 @@ class Proposal(db.Model):
         nullable=False,
     )
 
+    # Opaque, unguessable token used by the public /p/<token> share link —
+    # generated lazily the first time a proposal is sent, never the raw
+    # proposal_id (which is sequential and enumerable).
+    share_token = db.Column(
+        db.String(64),
+        unique=True,
+        nullable=True,
+    )
+
+    sent_at = db.Column(
+        db.DateTime(timezone=True),
+        nullable=True,
+    )
+
     # ==================================================
     # Relationships
     # ==================================================
@@ -116,6 +130,7 @@ class Proposal(db.Model):
                     "client_id": self.client.client_id,
                     "name": self.client.name,
                     "company": self.client.company,
+                    "email": self.client.email,
                 }
                 if self.client
                 else None
@@ -133,11 +148,47 @@ class Proposal(db.Model):
             "status": self.status,
             "generated_by": self.generated_by,
 
+            "sent_at": (
+                self.sent_at.isoformat()
+                if self.sent_at
+                else None
+            ),
+            "share_token": self.share_token,
+
             "created_at": (
                 self.created_at.isoformat()
                 if self.created_at
                 else None
             ),
+        }
+
+    def to_public_dict(self):
+        """Safe subset served by the unauthenticated /p/<token> page — no
+        internal user/transcript ids, no client contact details beyond the
+        company name, no share_token (the URL itself already is the key)."""
+        return {
+            "proposal_id": self.proposal_id,
+
+            "client": (
+                {"company": self.client.company}
+                if self.client
+                else None
+            ),
+
+            "scope_of_work": self.scope_of_work,
+            "deliverables": self.deliverables_list,
+            "timeline": self.timeline_milestones,
+
+            "version": self.version,
+            "status": self.status,
+
+            "created_at": (
+                self.created_at.isoformat()
+                if self.created_at
+                else None
+            ),
+
+            "quotes": [quote.to_public_dict() for quote in self.quotes],
         }
 
     def __repr__(self):

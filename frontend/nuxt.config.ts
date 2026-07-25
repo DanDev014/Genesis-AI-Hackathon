@@ -16,6 +16,18 @@ export default defineNuxtConfig({
 
   css: ['~/assets/css/main.css'],
 
+  vite: {
+    resolve: {
+      // html2pdf.js hardcodes `require("html2canvas")`, which doesn't support
+      // modern CSS color functions (oklch/oklab/lab/lch) that Chrome now uses
+      // for some of its own default/system colors. html2canvas-pro is a
+      // drop-in fork that adds support for them.
+      alias: {
+        html2canvas: 'html2canvas-pro'
+      }
+    }
+  },
+
   routeRules: {
     '/': { prerender: true }
   },

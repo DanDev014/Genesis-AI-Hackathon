@@ -16,3 +16,10 @@ class Config:
 
     SECRET_KEY = os.getenv("SECRET_KEY")
     JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY")
+
+    # ---------- Transactional email (proposal send) ----------
+    RESEND_API_KEY = os.getenv("RESEND_API_KEY")
+    MAIL_FROM = os.getenv("MAIL_FROM", "Kora AI <onboarding@resend.dev>")
+    # Base URL of the deployed frontend — used to build the public,
+    # unauthenticated share link a client clicks from their email.
+    PUBLIC_APP_URL = os.getenv("PUBLIC_APP_URL", "http://localhost:3000")

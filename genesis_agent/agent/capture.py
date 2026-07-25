@@ -159,6 +159,22 @@ def extract_structured_via_llm(text: str) -> Optional[dict]:
     return result if isinstance(result, dict) else None
 
 
+def is_pre_digested(payload: dict) -> bool:
+    """True if `payload` already looks like our own structured extraction
+    shape (meeting/client/project/... sections) rather than a source's raw
+    fields — the only case where a JSON body can skip straight into the
+    pipeline without an LLM call."""
+    return _is_structured_payload(payload)
+
+
+def raw_transcript_text(payload: dict) -> str:
+    """Pull just the transcript text out of a JSON payload, ignoring any
+    summary/ai_summary/notes fields a source (e.g. Fathom's own webhook)
+    may have included alongside it. We only ever extract from the actual
+    transcript, never a third party's own AI-generated summary."""
+    return _walk_for(payload, ["transcript"])
+
+
 # Containers a structured payload is commonly found wrapped inside — our own
 # /webhook/fathom response shape ("ok"/"captured"/"key_points") if someone
 # pastes it back in, plus the generic wrappers _walk_for already knows about.

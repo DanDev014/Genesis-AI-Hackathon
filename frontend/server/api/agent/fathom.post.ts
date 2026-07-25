@@ -127,35 +127,10 @@ async function handleDiscoveryMeeting({
   scriptResponse: any;
 }) {
   /**
-   * Generate summary.
-   */
-  const summaryResponse = await agentRequest<{
-    ok: boolean;
-    captured?: Record<string, unknown>;
-    reason?: string;
-  }>("/webhook/fathom", {
-    method: "POST",
-    body: scriptResponse,
-    headers: {
-      Accept: "application/json",
-    },
-  });
-
-  console.log("Summary response:", summaryResponse);
-
-  if (!summaryResponse.ok || !summaryResponse.captured) {
-    throw createError({
-      statusCode: 400,
-      statusMessage:
-        summaryResponse.reason ?? "Failed to generate meeting summary.",
-      data: {
-        error: summaryResponse.reason ?? "Failed to generate meeting summary.",
-      },
-    });
-  }
-
-  /**
-   * Persist summary.
+   * Persist summary. scriptResponse.captured already came back from
+   * /webhook/fathom/script's own extraction (real transcript in, our own
+   * LLM extraction out) — no need to round-trip it through a second
+   * webhook call just to re-validate what's already guaranteed truthy.
    */
   const savedSummary = await apiRequest("/summaries", {
     method: "POST",

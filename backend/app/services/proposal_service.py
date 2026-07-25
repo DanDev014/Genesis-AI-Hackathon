@@ -1,3 +1,6 @@
+import secrets
+from datetime import datetime
+
 from sqlalchemy import asc, desc
 
 from app.models.proposal import Proposal
@@ -7,6 +10,7 @@ from app.exceptions import (
     ResourceNotFound,
     ValidationError,
 )
+from app.services.email_service import send_email
 
 class ProposalService:
 
@@ -162,3 +166,72 @@ class ProposalService:
             )
 
         return proposal.to_dict()
+
+    @staticmethod
+    def get_public_proposal(token):
+        """Look up a proposal by its unguessable share token — this, not a
+        JWT, is the access boundary for the client-facing /p/<token> page."""
+
+        if not token:
+            return None
+
+        proposal = Proposal.query.filter_by(share_token=token).first()
+
+        if not proposal:
+            return None
+
+        return proposal.to_public_dict()
+
+    @staticmethod
+    def send_proposal(proposal_id, data):
+        """
+        POST /api/proposals/<id>/send
+
+        Generates the share link (once, reused on every subsequent send),
+        emails it to the given address, and marks the proposal as sent.
+        """
+        from flask import current_app
+
+        if not data or not (data.get("to_email") or "").strip():
+            raise ValidationError("Recipient email is required")
+
+        proposal = Proposal.query.get(proposal_id)
+
+        if proposal is None:
+            raise ResourceNotFound("Proposal not found")
+
+        if not proposal.share_token:
+            proposal.share_token = secrets.token_urlsafe(24)
+
+        share_url = f"{current_app.config.get('PUBLIC_APP_URL')}/p/{proposal.share_token}"
+
+        company = proposal.client.company if proposal.client else "your project"
+        subject = (data.get("subject") or "").strip() or f"Your proposal from Kora AI — {company}"
+        message = (data.get("message") or "").strip() or (
+            "Please find your proposal ready for review. Click below to view "
+            "the full scope, timeline, and pricing."
+        )
+
+        # Send before committing anything — if delivery fails we don't want
+        # a half-applied "sent" state sitting in the database.
+        send_email(
+            to_email=data["to_email"].strip(),
+            subject=subject,
+            heading="Your proposal is ready",
+            message=message,
+            cta_label="View proposal",
+            cta_url=share_url,
+        )
+
+        proposal.status = "sent"
+        proposal.sent_at = datetime.utcnow()
+
+        try:
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            raise DatabaseError("Email sent, but failed to update the proposal record.")
+
+        result = proposal.to_dict()
+        result["share_url"] = share_url
+        return result

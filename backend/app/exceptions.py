@@ -57,3 +57,11 @@ class DatabaseError(AppError):
     """
 
     status_code = 500
+
+
+class EmailDeliveryError(AppError):
+    """
+    Raised when sending a transactional email fails or isn't configured.
+    """
+
+    status_code = 502

@@ -52,9 +52,19 @@
                       icon="i-lucide-download"
                       color="neutral"
                       variant="outline"
+                      :loading="downloadingProposal"
+                      :disabled="downloadingProposal"
                       @click="downloadProposal"
                     >
                       Download PDF
+                    </UButton>
+
+                    <UButton
+                      icon="i-lucide-send"
+                      class="bg-primary font-semibold text-black hover:bg-yellow-400"
+                      @click="sendProposalOpen = true"
+                    >
+                      Send to client
                     </UButton>
 
                     <UButton
@@ -152,6 +162,8 @@
                       icon="i-lucide-download"
                       color="neutral"
                       variant="outline"
+                      :loading="downloadingQuotation"
+                      :disabled="downloadingQuotation"
                       @click="downloadQuotation"
                     >
                       Download PDF
@@ -264,6 +276,7 @@
 
   <EditProposalModal v-model="editProposalOpen" :proposal="proposal" @saved="onProposalSaved" />
   <EditQuotationModal v-model="editQuotationOpen" :quotation="quotation" @saved="onQuotationSaved" />
+  <SendProposalModal v-model="sendProposalOpen" :proposal="proposal" @sent="onProposalSaved" />
 </template>
 
 <script setup lang="ts">
@@ -291,6 +304,7 @@ const tabs = [
 
 const editProposalOpen = ref(false);
 const editQuotationOpen = ref(false);
+const sendProposalOpen = ref(false);
 
 // A freshly generated quotation always starts un-priced (line items seeded
 // at unit_price: 0 — see genesis_agent's _quote_line_items_from_key_points).
@@ -327,11 +341,44 @@ function attemptClose() {
   open.value = false;
 }
 
-function downloadProposal() {
-  if (props.proposal) downloadProposalPdf(props.proposal);
+const downloadingProposal = ref(false);
+const downloadingQuotation = ref(false);
+
+async function downloadProposal() {
+  if (!props.proposal || downloadingProposal.value) return;
+
+  downloadingProposal.value = true;
+  try {
+    await downloadProposalPdf(props.proposal);
+  } catch (error: any) {
+    console.error("Failed to generate proposal PDF", error);
+    toast.add({
+      title: "Couldn't download the PDF",
+      description: error?.message ?? "Something went wrong while generating the file.",
+      color: "error",
+      icon: "i-lucide-circle-alert",
+    });
+  } finally {
+    downloadingProposal.value = false;
+  }
 }
 
-function downloadQuotation() {
-  if (props.quotation) downloadQuotationPdf(props.quotation);
+async function downloadQuotation() {
+  if (!props.quotation || downloadingQuotation.value) return;
+
+  downloadingQuotation.value = true;
+  try {
+    await downloadQuotationPdf(props.quotation);
+  } catch (error: any) {
+    console.error("Failed to generate quotation PDF", error);
+    toast.add({
+      title: "Couldn't download the PDF",
+      description: error?.message ?? "Something went wrong while generating the file.",
+      color: "error",
+      icon: "i-lucide-circle-alert",
+    });
+  } finally {
+    downloadingQuotation.value = false;
+  }
 }
 </script>

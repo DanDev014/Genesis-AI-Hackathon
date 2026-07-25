@@ -207,20 +207,33 @@ async def fathom_webhook_script(meeting_type: FathomMeetingType,
                                 text: str = Body(..., media_type="text/plain")):
     """For pasting a raw script/transcript straight from Fathom — no JSON
     required. meeting_type is a required query parameter (send it as
-    ?meeting_type=discovery_meeting or ?meeting_type=internal). If the body
-    happens to already be JSON, that's used directly (zero tokens, same as
-    /webhook/fathom). Otherwise one cached, fast-tier LLM call turns it into
-    the same structured shape before it enters the normal capture pipeline —
-    meeting_type here always wins over whatever the extraction infers."""
+    ?meeting_type=discovery_meeting or ?meeting_type=internal).
+
+    We never trust a third party's own AI-generated summary (Fathom's
+    included) — only the transcript itself. A JSON body only skips our own
+    LLM extraction (zero tokens) when it's already our own structured shape
+    (e.g. a Zapier step that ran extraction upstream); any other JSON shape
+    — including Fathom's real webhook payload, which carries both a
+    transcript field and its own summary/ai_summary fields — has its
+    transcript field pulled out and run through our own extraction, same as
+    plain pasted text. meeting_type here always wins over whatever the
+    extraction infers."""
     text = (text or "").strip()
     if not text:
         return {"ok": False, "reason": "Empty body."}
 
     try:
         parsed = json.loads(text)
-        payload = parsed if isinstance(parsed, dict) else {"transcript": text}
     except Exception:
-        payload = capture.extract_structured_via_llm(text) or {"transcript": text}
+        parsed = None
+
+    if isinstance(parsed, dict) and capture.is_pre_digested(parsed):
+        payload = parsed
+    else:
+        raw_text = capture.raw_transcript_text(parsed) if isinstance(parsed, dict) else text
+        if not raw_text:
+            return {"ok": False, "reason": "No transcript text found in the payload."}
+        payload = capture.extract_structured_via_llm(raw_text) or {"transcript": raw_text}
 
     return _capture_payload(payload, meeting_type)
 

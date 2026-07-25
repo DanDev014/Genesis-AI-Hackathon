@@ -20,6 +20,9 @@ importers:
       '@pinia/nuxt':
         specifier: 1.0.1
         version: 1.0.1(magicast@0.5.3)(pinia@4.0.2(@vue/devtools-api@8.1.5)(typescript@6.0.3)(vue@3.5.35(typescript@6.0.3)))
+      html2canvas-pro:
+        specifier: ^2.3.0
+        version: 2.3.0
       html2pdf.js:
         specifier: ^0.14.0
         version: 0.14.0
@@ -3567,6 +3570,10 @@ packages:
 
   html-entities@2.6.0:
     resolution: {integrity: sha512-kig+rMn/QOVRvr7c86gQ8lWXq+Hkv6CbAH1hLu+RG338StTpE8Z0b44SDVaqVu7HGKf27frdmUYEs9hTUX/cLQ==}
+
+  html2canvas-pro@2.3.0:
+    resolution: {integrity: sha512-MuI3Gdf6E8tzZRsjdFrqM7FZT4+TgMmaUCbFmTwKe2vTk3QeivkXPRAr2Oy41SumExpaksqNGFykfbMGTn+Zdw==}
+    engines: {node: '>=16.0.0'}
 
   html2canvas@1.4.1:
     resolution: {integrity: sha512-fPU6BHNpsyIhr8yyMpTLLxAbkaK8ArIBcmZIRiBLiDhjeqvXolaEmDGmELFuX9I4xDcaKKcJl+TKZLqruBbmWA==}
@@ -9017,6 +9024,11 @@ snapshots:
   hookable@6.1.1: {}
 
   html-entities@2.6.0: {}
+
+  html2canvas-pro@2.3.0:
+    dependencies:
+      css-line-break: 2.1.0
+      text-segmentation: 1.0.3
 
   html2canvas@1.4.1:
     dependencies:
