@@ -37,6 +37,18 @@
           <UBadge :color="statusColor(quote.status)" variant="subtle">
             {{ quote.status }}
           </UBadge>
+          <UTooltip :text="quote.proposal?.approved ? '' : 'Approve the linked proposal first'">
+            <UButton
+              icon="i-lucide-banknote"
+              color="neutral"
+              :class="quote.proposal?.approved ? 'text-white' : ''"
+              :disabled="!quote.proposal?.approved"
+              :loading="sendingToQb"
+              @click="sendToQuickBooks"
+            >
+              Send to QuickBooks
+            </UButton>
+          </UTooltip>
           <UButton icon="i-lucide-pencil" class="text-white" @click="editOpen = true">
             Edit quotation
           </UButton>
@@ -83,6 +95,22 @@
           </div>
         </div>
       </UCard>
+
+      <UCard
+        v-if="quote.quickbooks_result"
+        :ui="{ root: 'ring-0 border border-neutral-200 !bg-white shadow-sm' }"
+      >
+        <template #header>
+          <h2 class="font-semibold text-neutral-950">QuickBooks</h2>
+        </template>
+        <p v-if="quote.quickbooks_result.ok" class="text-sm text-neutral-700">
+          Sent ({{ quote.quickbooks_result.mode }}) — Estimate
+          {{ quote.quickbooks_result.response?.Estimate?.Id }}
+        </p>
+        <p v-else class="text-sm text-red-600">
+          Failed ({{ quote.quickbooks_result.mode }}): {{ quote.quickbooks_result.error }}
+        </p>
+      </UCard>
     </template>
 
     <EditQuotationModal v-model="editOpen" :quotation="quote" @saved="onSaved" />
@@ -94,6 +122,10 @@ const route = useRoute();
 const quoteId = route.params.id as string;
 
 const editOpen = ref(false);
+const sendingToQb = ref(false);
+
+const toast = useToast();
+const authStore = useAuthStore();
 
 const {
   data: quote,
@@ -122,5 +154,33 @@ const taxAmount = computed(() => {
 async function onSaved(updated: any) {
   quote.value = updated;
   await refresh();
+}
+
+async function sendToQuickBooks() {
+  if (!quote.value?.quote_id) return;
+
+  sendingToQb.value = true;
+  try {
+    const response = await $fetch<{ success: boolean; data: any }>(
+      `/api/quotes/${quote.value.quote_id}/send-to-quickbooks`,
+      { method: "POST", body: { user_id: authStore.user?.user_id } },
+    );
+    quote.value = response.data;
+    await refresh();
+    toast.add({
+      title: response.data.quickbooks_result?.ok ? "Sent to QuickBooks" : "QuickBooks call failed",
+      color: response.data.quickbooks_result?.ok ? "success" : "error",
+      icon: response.data.quickbooks_result?.ok ? "i-lucide-circle-check" : "i-lucide-circle-alert",
+    });
+  } catch (error: any) {
+    toast.add({
+      title: "Couldn't send to QuickBooks",
+      description: error?.data?.message ?? error?.data?.error ?? error?.message ?? "Something went wrong.",
+      color: "error",
+      icon: "i-lucide-circle-alert",
+    });
+  } finally {
+    sendingToQb.value = false;
+  }
 }
 </script>

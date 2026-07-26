@@ -29,6 +29,20 @@ def list_proposals():
     return jsonify(result), 200
 
 
+@proposals_bp.get("/proposals/feedback-examples")
+def feedback_examples():
+    """
+    GET /api/proposals/feedback-examples?limit=3
+
+    Data source for genesis_agent's AI feedback loop — recent won/lost
+    AI-drafted proposals paired with the earliest human edit made to each.
+    """
+
+    limit = request.args.get("limit", 3, type=int)
+
+    return jsonify({"examples": ProposalService.feedback_examples(limit)}), 200
+
+
 @proposals_bp.get("/proposals/<int:proposal_id>")
 def get_proposal(proposal_id):
     """
@@ -88,6 +102,56 @@ def send_proposal(proposal_id):
         "message": "Proposal sent successfully",
         "data": proposal,
     }), 200
+
+
+@proposals_bp.post("/proposals/<int:proposal_id>/outcome")
+def record_outcome(proposal_id):
+    """
+    POST /api/proposals/<id>/outcome
+
+    Body: { outcome: "won"|"lost"|"pending", notes?: str }
+    """
+
+    proposal = ProposalService.record_outcome(
+        proposal_id, request.get_json(silent=True)
+    )
+
+    return jsonify({
+        "success": True,
+        "message": "Outcome recorded",
+        "data": proposal,
+    }), 200
+
+
+@proposals_bp.post("/proposals/<int:proposal_id>/approve")
+def approve_proposal(proposal_id):
+    """
+    POST /api/proposals/<id>/approve
+
+    Producer sign-off. One-way — required before a linked quote can be
+    sent to QuickBooks.
+    """
+
+    proposal = ProposalService.approve_proposal(
+        proposal_id, request.get_json(silent=True)
+    )
+
+    return jsonify({
+        "success": True,
+        "message": "Proposal approved",
+        "data": proposal,
+    }), 200
+
+
+@proposals_bp.get("/proposals/<int:proposal_id>/activity")
+def get_activity(proposal_id):
+    """
+    GET /api/proposals/<id>/activity
+
+    User-attributed event log for this proposal — newest first.
+    """
+
+    return jsonify({"activity": ProposalService.get_activity(proposal_id)}), 200
 
 
 @proposals_bp.get("/public/proposals/<string:token>")

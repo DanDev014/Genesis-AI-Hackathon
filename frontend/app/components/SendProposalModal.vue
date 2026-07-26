@@ -126,6 +126,7 @@ const emit = defineEmits<{
 }>();
 
 const toast = useToast();
+const authStore = useAuthStore();
 const sending = ref(false);
 
 const schema = v.object({
@@ -165,6 +166,7 @@ async function send() {
           to_email: form.to_email,
           subject: form.subject,
           message: form.message,
+          user_id: authStore.user?.user_id,
         },
       },
     );

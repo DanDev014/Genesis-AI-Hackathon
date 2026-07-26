@@ -57,6 +57,30 @@
           <p v-else class="text-sm text-neutral-500">Not yet established.</p>
         </UCard>
 
+        <UCard
+          v-if="proposal.requirements_checklist?.length"
+          :ui="{ root: 'ring-0 border border-neutral-200 !bg-white shadow-sm' }"
+        >
+          <template #header>
+            <h2 class="font-semibold text-neutral-950">Requirements</h2>
+          </template>
+          <ul class="space-y-2">
+            <li
+              v-for="(item, i) in proposal.requirements_checklist"
+              :key="i"
+              class="flex items-center gap-2 text-sm"
+              :class="item.checked ? 'text-neutral-400 line-through' : 'text-neutral-700'"
+            >
+              <UIcon
+                :name="item.checked ? 'i-lucide-check-circle-2' : 'i-lucide-circle'"
+                class="size-4 shrink-0"
+                :class="item.checked ? 'text-green-500' : 'text-neutral-300'"
+              />
+              {{ item.text }}
+            </li>
+          </ul>
+        </UCard>
+
         <UCard :ui="{ root: 'ring-0 border border-neutral-200 !bg-white shadow-sm' }">
           <template #header>
             <h2 class="font-semibold text-neutral-950">Timeline</h2>

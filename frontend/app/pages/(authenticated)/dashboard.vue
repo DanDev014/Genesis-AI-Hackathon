@@ -16,10 +16,10 @@
     </p>
 
     <!-- Metrics -->
-    <section v-if="pending" class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-      <USkeleton v-for="i in 4" :key="i" class="h-28 w-full rounded-2xl bg-neutral-200" />
+    <section v-if="pending" class="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+      <USkeleton v-for="i in 5" :key="i" class="h-28 w-full rounded-2xl bg-neutral-200" />
     </section>
-    <section v-else class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    <section v-else class="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
       <MetricCard
         label="Active clients"
         :value="String(metrics?.total_clients ?? 0)"
@@ -43,6 +43,12 @@
         :value="`${metrics?.win_rate ?? 0}%`"
         detail="Accepted vs. decided quotations"
         icon="i-lucide-trending-up"
+      />
+      <MetricCard
+        label="Time to proposal"
+        :value="timeToProposalValue"
+        detail="Meeting to delivered draft, avg"
+        icon="i-lucide-timer"
       />
     </section>
 
@@ -141,6 +147,7 @@ interface DashboardResponse {
       proposals_in_review: number;
       pipeline_value: number;
       win_rate: number;
+      avg_time_to_proposal_hours: number | null;
     };
     pipeline: { label: string; count: number }[];
     recent_activity: {
@@ -196,4 +203,11 @@ function pipelinePercent(count: number) {
 function formatNumber(n: number) {
   return Number(n ?? 0).toLocaleString();
 }
+
+const timeToProposalValue = computed(() => {
+  const hours = metrics.value?.avg_time_to_proposal_hours;
+  if (hours == null) return "—";
+  if (hours < 24) return `${hours}h`;
+  return `${(hours / 24).toFixed(1)}d`;
+});
 </script>

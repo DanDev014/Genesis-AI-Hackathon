@@ -137,6 +137,7 @@ const emit = defineEmits<{
 }>();
 
 const toast = useToast();
+const authStore = useAuthStore();
 const saving = ref(false);
 
 const statuses = ["draft", "sent", "accepted", "expired"];
@@ -207,6 +208,7 @@ async function save() {
           discount_amount: form.discount_amount,
           currency: form.currency,
           status: form.status,
+          user_id: authStore.user?.user_id,
         },
       },
     );
