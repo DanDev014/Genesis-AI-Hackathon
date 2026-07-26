@@ -9,6 +9,8 @@ Endpoints:
   GET  /captures/{name}       one capture (raw JSON on disk)
   GET  /captures/{name}/questions   suggested questions for the team
   POST /webhook/fathom        Fathom / Zapier posts summaries here
+  POST /webhook/fathom/script paste a raw script/transcript, no JSON required
+  POST /webhook/fathom/native Fathom's own automated webhook (HMAC-verified)
   GET  /brand                 the loaded brand config (sanity check)
   POST /render/proposal.html  render a proposal to HTML from a JSON body
   POST /render/proposal.pdf   same, but return a PDF (if WeasyPrint installed)
@@ -20,21 +22,25 @@ Endpoints:
 from __future__ import annotations
 
 import asyncio
+import base64
+import hashlib
+import hmac
 import json
+import os
 from pathlib import Path
-from typing import Literal
+from typing import Literal, Optional
 
 from dotenv import load_dotenv
 from pathlib import Path
 
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
-from fastapi import Body, FastAPI, HTTPException, Request
+from fastapi import Body, FastAPI, Header, HTTPException, Request
 from fastapi.responses import HTMLResponse, Response, RedirectResponse
 from pydantic import BaseModel, ConfigDict
 
 from agent import brand as brand_mod
-from agent import brief as brief_mod, capture, db, llm_client, questions, quickbooks, renderer, store, watcher
+from agent import brief as brief_mod, capture, db, flask_bridge, llm_client, questions, quickbooks, renderer, store, watcher
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import RedirectResponse
 import json as _json
@@ -124,8 +130,25 @@ class FathomWebhookPayload(BaseModel):
     meeting_type: FathomMeetingType
 
 
-def _capture_payload(payload: dict, meeting_type: str) -> dict:
-    meeting_type = _MEETING_TYPE_ALIASES[meeting_type]
+def _capture_payload(payload: dict, meeting_type: Optional[str] = None,
+                      deliver: str = "local") -> dict:
+    """meeting_type is optional — when the caller doesn't have a human
+    around to set it (an automated webhook), it falls through to the same
+    auto-classify capture.py already does for a raw transcript
+    (participant email-domain heuristic in save_capture ->
+    classify_meeting_type), via meeting_type_hint="" below.
+
+    deliver="local" (default, used by /webhook/fathom and
+    /webhook/fathom/script): draft proposal/quote via _internal_meeting_
+    deliverables(), which writes to genesis_agent's own local store — for
+    the script endpoint, Nuxt then does its own separate POST to Flask
+    with this data, so nothing here needs to reach Flask directly.
+
+    deliver="flask" (used only by /webhook/fathom/native): there's no Nuxt
+    in the loop for an automated webhook, so this calls flask_bridge to
+    create the real Proposal/Quote/Summary directly — otherwise an
+    automated capture would never show up anywhere in the actual app."""
+    resolved_hint = _MEETING_TYPE_ALIASES[meeting_type] if meeting_type else ""
     # Top-level meeting_type is our own routing control field, not meeting
     # content — drop it so it doesn't leak into the flattened summary text.
     payload = {k: v for k, v in payload.items() if k != "meeting_type"}
@@ -142,15 +165,33 @@ def _capture_payload(payload: dict, meeting_type: str) -> dict:
         title=parts["title"],
         external_id=parts["external_id"],
         raw=parts.get("structured_root") or payload,
-        meeting_type_hint=meeting_type,
+        # A structured payload's own meeting.meeting_type (parts[...]) wins
+        # as the fallback over blind classification when there's no
+        # explicit caller-supplied meeting_type either.
+        meeting_type_hint=resolved_hint or parts["meeting_type_hint"],
         extra_action_items=parts.get("action_items", []),
+        meeting_occurred_at=parts.get("meeting_occurred_at", ""),
     )
+    # save_capture() resolves the final "discovery_call" | "internal" value
+    # (auto-classifying from participants if both hints above were empty)
+    # — read it back rather than trusting whatever we passed in.
+    resolved_meeting_type = record["meeting_type"]
+    key_points = record.get("key_points", {})
 
-    if meeting_type == "internal":
+    if deliver == "flask":
+        if resolved_meeting_type == "internal":
+            proposal_data = _proposal_data_from_key_points(record.get("title", ""), key_points)
+            line_items = _quote_line_items_from_key_points(key_points)
+            result = flask_bridge.deliver_internal_meeting(key_points, proposal_data, line_items)
+        else:
+            result = flask_bridge.deliver_discovery_call(key_points)
+        return {"meeting_type": resolved_meeting_type, "captured": record, **result}
+
+    if resolved_meeting_type == "internal":
         return _internal_meeting_deliverables(record)
 
     deliverables = _proposal_data_from_key_points(
-        record.get("title", ""), record.get("key_points", {})
+        record.get("title", ""), key_points
     )["deliverables"]
     return {"ok": True, "meeting_type": "discovery_call", "captured": record,
             "summary": parts["summary"], "deliverables": deliverables}
@@ -163,6 +204,7 @@ def _internal_meeting_deliverables(record: dict) -> dict:
     time (and was cached if it went through the script endpoint)."""
     key_points = record.get("key_points", {})
     proposal_data = _proposal_data_from_key_points(record.get("title", ""), key_points)
+    proposal_data["meeting_occurred_at"] = record.get("meeting_occurred_at", "")
 
     try:
         proposal = store.save_proposal(proposal_data)
@@ -236,6 +278,92 @@ async def fathom_webhook_script(meeting_type: FathomMeetingType,
         payload = capture.extract_structured_via_llm(raw_text) or {"transcript": raw_text}
 
     return _capture_payload(payload, meeting_type)
+
+
+# --------------------------- native Fathom webhook ---------------------------
+# Fathom's own webhook (Settings -> API Access -> Add Webhook), as opposed to
+# the two endpoints above (a Zapier step, or a human pasting a script) — this
+# one fires automatically with nobody around to authenticate the request or
+# pick a meeting_type by hand, so both of those get handled here instead.
+FATHOM_WEBHOOK_SECRET = os.getenv("FATHOM_WEBHOOK_SECRET", "")
+
+
+def _verify_fathom_signature(body: bytes, webhook_id: str, webhook_timestamp: str,
+                              signature_header: str) -> bool:
+    """Svix-style HMAC-SHA256 verification — the scheme behind the
+    webhook-id / webhook-timestamp / webhook-signature headers and the
+    whsec_... secret format Fathom's webhook docs describe. Fails closed:
+    no secret configured, or any header missing, means "reject."
+
+    NOT YET CONFIRMED against a real Fathom-signed request — Fathom's docs
+    describe this exact header/secret convention but a live payload to test
+    against hasn't been captured yet. Verify this once real traffic flows
+    before fully trusting it in production.
+    """
+    if not FATHOM_WEBHOOK_SECRET or not (webhook_id and webhook_timestamp and signature_header):
+        return False
+    try:
+        secret_bytes = base64.b64decode(FATHOM_WEBHOOK_SECRET.removeprefix("whsec_"))
+    except Exception:
+        return False
+
+    signed_content = f"{webhook_id}.{webhook_timestamp}.{body.decode('utf-8')}"
+    expected = base64.b64encode(
+        hmac.new(secret_bytes, signed_content.encode("utf-8"), hashlib.sha256).digest()
+    ).decode("utf-8")
+
+    provided = [part.split(",", 1)[1] for part in signature_header.split() if "," in part]
+    return any(hmac.compare_digest(expected, sig) for sig in provided)
+
+
+@app.post("/webhook/fathom/native")
+async def fathom_webhook_native(
+    request: Request,
+    meeting_type: Optional[FathomMeetingType] = None,
+    webhook_id: str = Header(default="", alias="webhook-id"),
+    webhook_timestamp: str = Header(default="", alias="webhook-timestamp"),
+    webhook_signature: str = Header(default="", alias="webhook-signature"),
+):
+    """Fathom's real, automated webhook. HMAC-verified (see above);
+    meeting_type is optional and falls through to _capture_payload's own
+    auto-classify fallback when Fathom doesn't send one — no human is
+    present to pick discovery vs. internal for an automated POST.
+
+    This is the only endpoint that delivers via flask_bridge (deliver=
+    "flask") — a discovery call creates a real Summary, an internal
+    meeting creates a real Proposal + Quote, both directly in Flask's
+    database via its own API, with no human pasting anything and no Nuxt
+    step in between. See flask_bridge.py for the client-resolution
+    shortcuts (placeholder email/industry when a transcript doesn't state
+    them) and the required FLASK_API_URL / GENESIS_SYSTEM_USER_ID env vars.
+
+    STILL A PLACEHOLDER for one thing: the exact JSON key Fathom uses for
+    the transcript hasn't been confirmed against a real payload yet (a live
+    webhook -> webhook.site capture is the fast way to close that gap).
+    capture.raw_transcript_text()'s lookup list may need one more key added
+    once that's known — everything else here already works against
+    whatever shape arrives.
+    """
+    body = await request.body()
+    if not _verify_fathom_signature(body, webhook_id, webhook_timestamp, webhook_signature):
+        raise HTTPException(401, "Invalid or missing webhook signature.")
+
+    try:
+        parsed = json.loads(body)
+    except Exception:
+        raise HTTPException(400, "Invalid JSON body.")
+    if not isinstance(parsed, dict):
+        raise HTTPException(400, "Invalid JSON body.")
+
+    if capture.is_pre_digested(parsed):
+        payload = parsed
+    else:
+        raw_text = capture.raw_transcript_text(parsed)
+        if not raw_text:
+            return {"ok": False, "reason": "No transcript text found in the payload."}
+        payload = capture.extract_structured_via_llm(raw_text) or {"transcript": raw_text}
+
+    return _capture_payload(payload, meeting_type, deliver="flask")
 
 
 # --------------------------- branded document rendering ---------------------------
@@ -555,12 +683,15 @@ def _proposal_data_from_key_points(title: str, key_points: dict) -> dict:
     if isinstance(timeline, dict):
         timeline = "; ".join(f"{k.replace('_', ' ')}: {v}" for k, v in timeline.items())
 
+    requirements = [str(r) for r in (key_points.get("requirements") or []) if r]
+
     return {
         "client_company": client.get("company") or title,
         "client_name": client.get("primary_contact", ""),
         "title": project.get("name") or title,
         "scope": project.get("objective") or "",
         "deliverables": deliverables,
+        "requirements": requirements,
         "timeline": timeline or "",
         "status": "draft",
     }

@@ -22,7 +22,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-from agent import llm_client, questions
+from agent import feedback, llm_client, questions
 
 # Fields Fathom / Zapier are known to put the summary text in. Order matters:
 # we prefer the AI summary over notes over raw transcript.
@@ -32,6 +32,15 @@ SUMMARY_KEYS = [
 ]
 TITLE_KEYS = ["title", "meeting_title", "topic", "subject", "name"]
 ID_KEYS = ["id", "meeting_id", "recording_id", "url", "recording_url"]
+
+# Best-effort guesses at where a source puts the actual meeting timestamp —
+# UNCONFIRMED against a real Fathom payload, same caveat as raw_transcript_
+# text()'s lookup list (see main.py's /webhook/fathom/native docstring).
+# Falls back to capture time (save_capture's default) when none of these hit.
+MEETING_TIME_KEYS = [
+    "meeting_occurred_at", "meeting_date", "meeting_time", "started_at",
+    "start_time", "recording_start_time", "call_time", "date",
+]
 
 # Where captures land. Callers set these once at startup.
 CAPTURES_DIR = Path("captures")
@@ -137,6 +146,7 @@ Schema — omit any key with no real signal in the transcript, never invent valu
  "target_audience":[{"segment":str,"goal":str}],
  "creative_direction":{"style":str,"description":str,"messaging_themes":[str]},
  "deliverables":[{"name":str,"duration":str,"quantity":str,"status":str}],
+ "requirements":[str],
  "timeline":{"<label>":"<value>"},
  "budget":{"status":str,"currency":str,"estimated_budget":number|null},
  "competition":{"has_competition":bool,"other_agencies":number,"selection_method":str},
@@ -148,14 +158,24 @@ meeting_type is "Discovery" if any speaker is external (shown with an email
 domain in parentheses next to their name, e.g. "Name (company.com)", or is
 clearly a client); "Internal" if every speaker is on the same team.
 
+requirements are the client's stated constraints/asks — "must work on
+mobile", "needs SSO", "launch before Black Friday" — distinct from
+deliverables, which are the things being built/shipped.
+
 Use short phrases, not sentences. Be terse — this is metadata, not prose."""
 
 
 def extract_structured_via_llm(text: str) -> Optional[dict]:
     """Turn a raw pasted script into the structured shape above. Returns
     None (caller falls back to the zero-token regex/keyword path) if
-    there's no API key or the call fails — never raises."""
-    result = llm_client.call_json(_EXTRACTION_SYSTEM_PROMPT, text, tier="fast")
+    there's no API key or the call fails — never raises.
+
+    The AI feedback loop: appends recent team corrections to past AI drafts
+    (fetched from the Flask backend, best-effort — see agent/feedback.py)
+    as calibration context. A no-op, zero-latency prefix when
+    FEEDBACK_API_URL isn't configured."""
+    system_prompt = _EXTRACTION_SYSTEM_PROMPT + feedback.build_context_suffix()
+    result = llm_client.call_json(system_prompt, text, tier="fast")
     return result if isinstance(result, dict) else None
 
 
@@ -198,6 +218,18 @@ def _find_structured_root(payload: dict, depth: int = 2) -> dict:
     return payload
 
 
+def _parse_meeting_time(payload: dict) -> str:
+    """Best-effort meeting timestamp, ISO-normalized. Returns "" (caller
+    falls back to capture time) if nothing parseable is found."""
+    raw = _walk_for(payload, MEETING_TIME_KEYS)
+    if not raw:
+        return ""
+    try:
+        return datetime.fromisoformat(raw.replace("Z", "+00:00")).isoformat()
+    except Exception:
+        return ""
+
+
 def extract_from_payload(payload: dict) -> dict:
     """Pull the summary + title + a stable id out of a webhook payload.
 
@@ -234,6 +266,7 @@ def extract_from_payload(payload: dict) -> dict:
         "meeting_type_hint": meeting_type_hint,
         "action_items": action_items,
         "structured_root": structured_root,
+        "meeting_occurred_at": _parse_meeting_time(payload),
     }
 
 
@@ -332,7 +365,7 @@ def classify_meeting_type(participants: list) -> str:
 # about who processed the call and when isn't a key point of the meeting).
 KEY_POINT_SECTIONS = [
     "meeting", "client", "project", "target_audience", "creative_direction",
-    "deliverables", "timeline", "budget", "competition", "client_feedback",
+    "deliverables", "requirements", "timeline", "budget", "competition", "client_feedback",
     "risks", "opportunities", "next_steps", "ai_summary", "crm",
 ]
 
@@ -373,7 +406,8 @@ def _key_points_is_thin(key_points: Optional[dict]) -> bool:
 
 def save_capture(source: str, summary: str, title: str = "",
                  external_id: str = "", raw: Optional[dict] = None,
-                 meeting_type_hint: str = "", extra_action_items: Optional[list] = None) -> dict:
+                 meeting_type_hint: str = "", extra_action_items: Optional[list] = None,
+                 meeting_occurred_at: str = "") -> dict:
     """
     Store a Fathom summary as a capture. Returns a small record describing
     what was saved (or was already there, if we've seen this one before).
@@ -382,8 +416,13 @@ def save_capture(source: str, summary: str, title: str = "",
     the answer (a structured call-intelligence payload names its own
     meeting_type and next_steps) skip the text-based inference below, which
     only has transcript speaker lines and inline markers to go on.
+
+    meeting_occurred_at: best-effort real meeting timestamp (see
+    MEETING_TIME_KEYS above) — falls back to capture time (now) when the
+    payload didn't carry one. Powers the time-to-proposal metric.
     """
     fp = fingerprint(external_id or {"s": summary, "t": title})
+    resolved_meeting_time = meeting_occurred_at or datetime.utcnow().isoformat()
     if fp in _seen:
         # Fathom retries send identical content, so this path isn't rare —
         # it should return the same useful key_points as the original
@@ -400,6 +439,7 @@ def save_capture(source: str, summary: str, title: str = "",
                 "title": existing.get("title", ""),
                 "meeting_type": existing.get("meeting_type", ""),
                 "key_points": existing.get("key_points", {}),
+                "meeting_occurred_at": existing.get("meeting_occurred_at", resolved_meeting_time),
             })
         # The cached capture came from a transient extraction failure (e.g.
         # a one-off LLM hiccup) that fell back to an empty result. Don't
@@ -428,6 +468,7 @@ def save_capture(source: str, summary: str, title: str = "",
 
     record = {
         "captured_at": datetime.utcnow().isoformat(),
+        "meeting_occurred_at": resolved_meeting_time,
         "source": source,                     # "webhook" | "folder"
         "external_id": external_id,
         "title": title,
@@ -445,4 +486,5 @@ def save_capture(source: str, summary: str, title: str = "",
     return _log("captured", fname, {"source": source, "title": title,
                                      "meeting_type": meeting_type,
                                      "key_points": key_points,
+                                     "meeting_occurred_at": resolved_meeting_time,
                                      "chars": len(summary), "fingerprint": fp})

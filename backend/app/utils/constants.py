@@ -65,6 +65,15 @@ PROPOSAL_GENERATED_BY = (
 )
 
 
+# Business outcome of the deal — distinct from `status`, which only tracks
+# the document's own lifecycle (draft/sent/revised/accepted/rejected).
+PROPOSAL_OUTCOMES = (
+    "pending",
+    "won",
+    "lost",
+)
+
+
 # ===================================================
 # QUOTES
 # ===================================================

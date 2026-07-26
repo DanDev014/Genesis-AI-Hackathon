@@ -109,6 +109,7 @@ const emit = defineEmits<{
 }>();
 
 const toast = useToast();
+const authStore = useAuthStore();
 const saving = ref(false);
 
 const statuses = ["draft", "sent", "revised", "accepted", "rejected"];
@@ -151,6 +152,7 @@ async function save() {
           timeline_milestones: form.timeline,
           status: form.status,
           deliverables_list: form.deliverables.filter((d) => d.trim()),
+          user_id: authStore.user?.user_id,
         },
       },
     );

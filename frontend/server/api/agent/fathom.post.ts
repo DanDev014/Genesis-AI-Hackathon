@@ -184,7 +184,11 @@ async function handleInternalMeeting({
 
       deliverables_list: scriptResponse.proposal.deliverables,
 
+      requirements_checklist: scriptResponse.proposal.requirements,
+
       timeline_milestones: scriptResponse.proposal.timeline,
+
+      meeting_occurred_at: scriptResponse.proposal.meeting_occurred_at,
 
       generated_by: "AI-drafted",
 

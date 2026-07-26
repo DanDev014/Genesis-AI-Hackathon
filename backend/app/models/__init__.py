@@ -5,3 +5,4 @@ from .transcript import Transcript
 from .proposal import Proposal
 from .quote import Quote
 from .team_member import TeamMember
+from .activity_log import ActivityLog

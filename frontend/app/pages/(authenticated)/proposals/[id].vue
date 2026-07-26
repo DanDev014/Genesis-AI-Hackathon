@@ -42,13 +42,35 @@
           <p v-if="proposal.sent_at" class="mt-1 text-xs text-neutral-400">
             Last sent {{ new Date(proposal.sent_at).toLocaleString() }}
           </p>
+          <p v-if="proposal.time_to_proposal_hours != null" class="mt-1 text-xs text-neutral-400">
+            Meeting → draft: {{ proposal.time_to_proposal_hours }}h
+          </p>
         </div>
         <div class="flex items-center gap-3">
           <UBadge :color="statusColor(proposal.status)" variant="subtle">
             {{ proposal.status }}
           </UBadge>
+          <UBadge v-if="proposal.outcome && proposal.outcome !== 'pending'" :color="outcomeColor(proposal.outcome)" variant="subtle">
+            {{ proposal.outcome }}
+          </UBadge>
+          <UBadge v-if="proposal.approved" color="success" variant="subtle">
+            Approved
+          </UBadge>
           <UButton icon="i-lucide-send" class="text-white" @click="sendOpen = true">
             Send to client
+          </UButton>
+          <UButton icon="i-lucide-flag" color="neutral" class="text-white" @click="outcomeOpen = true">
+            Record outcome
+          </UButton>
+          <UButton
+            v-if="!proposal.approved"
+            icon="i-lucide-badge-check"
+            color="neutral"
+            class="text-white"
+            :loading="approving"
+            @click="approve"
+          >
+            Approve
           </UButton>
           <UButton icon="i-lucide-pencil" class="text-white" @click="editOpen = true">
             Edit draft
@@ -82,6 +104,8 @@
             </ul>
             <p v-else class="text-sm text-neutral-500">Not yet established.</p>
           </UCard>
+
+          <RequirementsChecklist :proposal="proposal" @saved="onSaved" />
         </div>
 
         <aside class="space-y-5 lg:col-span-2">
@@ -127,6 +151,45 @@
             </ul>
             <p v-else class="text-sm text-neutral-500">No quotations yet.</p>
           </UCard>
+
+          <UCard
+            v-if="proposal.outcome && proposal.outcome !== 'pending'"
+            :ui="{ root: 'ring-0 border border-neutral-200 !bg-white shadow-sm' }"
+          >
+            <template #header>
+              <h2 class="font-semibold text-neutral-950">Outcome</h2>
+            </template>
+            <p class="text-sm text-neutral-700">
+              Marked <span class="font-medium">{{ proposal.outcome }}</span>
+              <template v-if="proposal.outcome_at">
+                on {{ new Date(proposal.outcome_at).toLocaleDateString() }}
+              </template>
+            </p>
+            <p v-if="proposal.outcome_notes" class="mt-2 whitespace-pre-line text-sm text-neutral-600">
+              {{ proposal.outcome_notes }}
+            </p>
+          </UCard>
+
+          <UCard :ui="{ root: 'ring-0 border border-neutral-200 !bg-white shadow-sm' }">
+            <template #header>
+              <h2 class="font-semibold text-neutral-950">Activity</h2>
+            </template>
+            <div v-if="activityPending" class="space-y-2">
+              <USkeleton class="h-8 w-full bg-neutral-200" />
+            </div>
+            <ul v-else-if="activity.length" class="space-y-3">
+              <li v-for="entry in activity" :key="entry.activity_log_id" class="text-sm">
+                <p class="text-neutral-700">
+                  <span class="font-medium">{{ entry.user_email || "System" }}</span>
+                  {{ activityLabel(entry.action) }}
+                </p>
+                <p class="text-xs text-neutral-400">
+                  {{ new Date(entry.created_at).toLocaleString() }}
+                </p>
+              </li>
+            </ul>
+            <p v-else class="text-sm text-neutral-500">No activity recorded yet.</p>
+          </UCard>
         </aside>
       </section>
     </template>
@@ -141,6 +204,11 @@
       :proposal="proposal"
       @sent="onSaved"
     />
+    <RecordOutcomeModal
+      v-model="outcomeOpen"
+      :proposal="proposal"
+      @saved="onSaved"
+    />
   </main>
 </template>
 
@@ -150,6 +218,11 @@ const proposalId = route.params.id as string;
 
 const editOpen = ref(false);
 const sendOpen = ref(false);
+const outcomeOpen = ref(false);
+const approving = ref(false);
+
+const toast = useToast();
+const authStore = useAuthStore();
 
 const {
   data: proposal,
@@ -164,10 +237,36 @@ const { data: quotesData, pending: quotesPending } = await useLazyFetch<{
 
 const quotes = computed(() => quotesData.value?.data ?? []);
 
+const {
+  data: activityData,
+  pending: activityPending,
+  refresh: refreshActivity,
+} = await useLazyFetch<{ activity: any[] }>(`/api/proposals/${proposalId}/activity`);
+
+const activity = computed(() => activityData.value?.activity ?? []);
+
+const ACTIVITY_LABELS: Record<string, string> = {
+  created: "created this proposal",
+  updated: "updated this proposal",
+  sent: "sent this proposal to the client",
+  outcome_recorded: "recorded an outcome",
+  approved: "approved this proposal",
+};
+
+function activityLabel(action: string) {
+  return ACTIVITY_LABELS[action] ?? action;
+}
+
 function statusColor(status: string) {
   if (status === "accepted") return "success";
   if (status === "sent" || status === "revised") return "warning";
   if (status === "rejected") return "error";
+  return "neutral";
+}
+
+function outcomeColor(outcome: string) {
+  if (outcome === "won") return "success";
+  if (outcome === "lost") return "error";
   return "neutral";
 }
 
@@ -178,5 +277,34 @@ function formatNumber(n: number) {
 async function onSaved(updated: any) {
   proposal.value = updated;
   await refresh();
+  await refreshActivity();
+}
+
+async function approve() {
+  if (!proposal.value?.proposal_id) return;
+
+  approving.value = true;
+  try {
+    const response = await $fetch<{ success: boolean; data: any }>(
+      `/api/proposals/${proposal.value.proposal_id}/approve`,
+      { method: "POST", body: { user_id: authStore.user?.user_id } },
+    );
+    await onSaved(response.data);
+    toast.add({
+      title: "Proposal approved",
+      description: "Linked quotes can now be sent to QuickBooks.",
+      color: "success",
+      icon: "i-lucide-circle-check",
+    });
+  } catch (error: any) {
+    toast.add({
+      title: "Couldn't approve the proposal",
+      description: error?.data?.message ?? error?.data?.error ?? error?.message ?? "Something went wrong.",
+      color: "error",
+      icon: "i-lucide-circle-alert",
+    });
+  } finally {
+    approving.value = false;
+  }
 }
 </script>

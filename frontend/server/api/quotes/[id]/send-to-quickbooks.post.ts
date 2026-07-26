@@ -2,14 +2,9 @@ import { apiRequest } from "~~/server/utils/request";
 
 export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, "id");
-  const body = await readBody<{
-    to_email: string;
-    subject?: string;
-    message?: string;
-    user_id?: number;
-  }>(event);
+  const body = await readBody<{ user_id?: number }>(event);
 
-  return apiRequest(`/proposals/${id}/send`, {
+  return apiRequest(`/quotes/${id}/send-to-quickbooks`, {
     method: "POST",
     body,
   });

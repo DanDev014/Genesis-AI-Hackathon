@@ -3,10 +3,15 @@ from sqlalchemy import desc
 from app.extensions import db
 from app.models.quote import Quote
 from app.exceptions import (
+    ConflictError,
     DatabaseError,
     ResourceNotFound,
     ValidationError,
 )
+from app.services.webhook_dispatcher import dispatch_event
+from app.services.activity_log_service import ActivityLogService
+from app.services.proposal_service import ProposalService
+from app.services import quickbooks_service
 
 
 class QuoteService:
@@ -120,6 +125,13 @@ class QuoteService:
         )
 
         db.session.add(quote)
+        db.session.flush()
+
+        ActivityLogService.record(
+            "quote", quote.quote_id, "created",
+            user_id=data.get("user_id"),
+        )
+
         db.session.commit()
 
         return quote.to_dict()
@@ -142,6 +154,8 @@ class QuoteService:
 
         if quote is None:
             raise ResourceNotFound("Quote not found")
+
+        was_sent = quote.status == "sent"
 
         if "line_items" in data:
             items = []
@@ -174,6 +188,13 @@ class QuoteService:
         if "status" in data:
             quote.status = data["status"]
 
+        just_sent = quote.status == "sent" and not was_sent
+
+        ActivityLogService.record(
+            "quote", quote.quote_id, "sent" if just_sent else "updated",
+            user_id=data.get("user_id"),
+        )
+
         try:
             db.session.commit()
         except Exception:
@@ -182,5 +203,53 @@ class QuoteService:
             raise DatabaseError(
                 "Unable to update quote."
             )
+
+        result = quote.to_dict()
+
+        if just_sent:
+            dispatch_event("quote.sent", result)
+
+        return result
+
+    @staticmethod
+    def send_to_quickbooks(quote_id, data):
+        """
+        POST /api/quotes/<id>/send-to-quickbooks
+
+        Body: { user_id? }
+
+        Blocked until the quote's linked proposal has been approved
+        (ProposalService.approve_proposal) — no override. Building a real
+        QuickBooks Estimate from an unreviewed AI-guessed scope/price is
+        exactly the risk this gate exists to prevent.
+        """
+
+        quote = Quote.query.get(quote_id)
+
+        if quote is None:
+            raise ResourceNotFound("Quote not found")
+
+        if not ProposalService.is_approved(quote.proposal_id):
+            raise ConflictError(
+                "This quote's proposal hasn't been approved yet. "
+                "Approve it before sending to QuickBooks."
+            )
+
+        result = quickbooks_service.send_estimate(quote.to_dict())
+        quote.quickbooks_result = result
+        if result.get("ok"):
+            quote.status = "sent"
+
+        ActivityLogService.record(
+            "quote", quote.quote_id, "sent_to_quickbooks",
+            user_id=(data or {}).get("user_id"),
+            details={"mode": result.get("mode"), "ok": result.get("ok")},
+        )
+
+        try:
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            raise DatabaseError("QuickBooks call completed, but failed to save the result.")
 
         return quote.to_dict()

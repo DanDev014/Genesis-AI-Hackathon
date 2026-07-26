@@ -71,6 +71,14 @@ class Quote(db.Model):
         nullable=False,
     )
 
+    # Full result of the last send-to-QuickBooks attempt — mode, ok/error,
+    # the built payload, and whatever QuickBooks (or the simulation) sent
+    # back. Null until the quote's been sent at least once.
+    quickbooks_result = db.Column(
+        JSONB,
+        nullable=True,
+    )
+
     created_at = db.Column(
         db.DateTime(timezone=True),
         default=datetime.utcnow,
@@ -106,6 +114,7 @@ class Quote(db.Model):
                     "client_id": self.proposal.client_id,
                     "version": self.proposal.version,
                     "status": self.proposal.status,
+                    "approved": self.proposal.approved_at is not None,
                     "client": (
                         {
                             "name": self.proposal.client.name,
@@ -161,6 +170,8 @@ class Quote(db.Model):
             "status": self.status,
 
             "line_items": self.line_items,
+
+            "quickbooks_result": self.quickbooks_result,
 
             "created_at": (
                 self.created_at.isoformat()
