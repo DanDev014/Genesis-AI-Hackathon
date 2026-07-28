@@ -19,7 +19,7 @@ class Config:
 
     # ---------- Transactional email (proposal send) ----------
     RESEND_API_KEY = os.getenv("RESEND_API_KEY")
-    MAIL_FROM = os.getenv("MAIL_FROM", "Kora AI <onboarding@resend.dev>")
+    MAIL_FROM = os.getenv("MAIL_FROM", "Tafsiri <onboarding@resend.dev>")
     # Base URL of the deployed frontend — used to build the public,
     # unauthenticated share link a client clicks from their email.
     PUBLIC_APP_URL = os.getenv("PUBLIC_APP_URL", "http://localhost:3000")
@@ -30,7 +30,7 @@ class Config:
     # Unset means the dispatcher is a no-op.
     OUTBOUND_WEBHOOK_URL = os.getenv("OUTBOUND_WEBHOOK_URL")
     # Optional — if set, every outbound webhook is signed with HMAC-SHA256
-    # in the X-Kora-Signature header so the receiver can verify it came
+    # in the X-Tafsiri-Signature header so the receiver can verify it came
     # from us.
     OUTBOUND_WEBHOOK_SECRET = os.getenv("OUTBOUND_WEBHOOK_SECRET")
 

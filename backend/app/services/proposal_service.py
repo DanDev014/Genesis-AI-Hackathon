@@ -336,7 +336,7 @@ class ProposalService:
         share_url = f"{current_app.config.get('PUBLIC_APP_URL')}/p/{proposal.share_token}"
 
         company = proposal.client.company if proposal.client else "your project"
-        subject = (data.get("subject") or "").strip() or f"Your proposal from Kora AI — {company}"
+        subject = (data.get("subject") or "").strip() or f"Your proposal from Tafsiri — {company}"
         message = (data.get("message") or "").strip() or (
             "Please find your proposal ready for review. Click below to view "
             "the full scope, timeline, and pricing."

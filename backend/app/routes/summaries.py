@@ -58,3 +58,19 @@ def update_summary(summary_id):
     )
 
     return jsonify(result), 200
+
+
+@summaries_bp.post("/summaries/<int:summary_id>/send")
+def send_summary(summary_id):
+    """
+    POST /api/summaries/<id>/send
+
+    Body: { to_emails: string[], subject?, message? }
+    """
+
+    result = SummaryService.send_summary(
+        summary_id,
+        request.get_json(silent=True),
+    )
+
+    return jsonify(result), 200

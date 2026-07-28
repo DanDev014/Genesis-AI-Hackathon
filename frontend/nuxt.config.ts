@@ -7,7 +7,7 @@ export default defineNuxtConfig({
 
   app: {
     head: {
-      title: 'Kora AI',
+      title: 'Tafsiri',
       link: [
         { rel: 'icon', type: 'image/svg+xml', href: '/favicon.svg' }
       ]

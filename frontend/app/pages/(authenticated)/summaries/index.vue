@@ -6,7 +6,7 @@
           Summaries
         </h1>
       </div>
-      <UButton to="/kora-ai" icon="i-lucide-upload" class="text-white">
+      <UButton to="/tafsiri" icon="i-lucide-upload" class="text-white">
         Process transcript
       </UButton>
     </div>

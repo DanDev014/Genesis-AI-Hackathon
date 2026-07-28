@@ -1,0 +1,27 @@
+{
+  "proposal_id": "0003__20260727-172334__untitled.json",
+  "client_company": "",
+  "client_name": "",
+  "title": "",
+  "line_items": [
+    {
+      "item": "Test backend locally; update Daniel; schedule serious meeting w/ Daniel + Saeed Zioni; prep implementation presentation",
+      "qty": 1,
+      "unit_price": 0,
+      "amount": 0
+    },
+    {
+      "item": "Revamp proposal/quotation; remove tech stack; send to Daniel",
+      "qty": 1,
+      "unit_price": 0,
+      "amount": 0
+    }
+  ],
+  "currency": "KES",
+  "status": "draft",
+  "subtotal": 0,
+  "total": 0,
+  "number": "0003",
+  "created_at": "2026-07-27T17:23:34.124841",
+  "kind": "quote"
+}

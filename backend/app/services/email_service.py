@@ -16,7 +16,7 @@ def _brand_email_html(heading: str, message: str, cta_label: str, cta_url: str) 
 <div style="font-family:Arial,Helvetica,sans-serif;background:#f5f5f5;padding:32px 0;">
   <div style="max-width:520px;margin:0 auto;background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e5e5e5;">
     <div style="background:#0a0a0a;padding:24px 32px;">
-      <span style="color:#e0b818;font-weight:700;font-size:18px;">Kora AI</span>
+      <span style="color:#e0b818;font-weight:700;font-size:18px;">Tafsiri</span>
     </div>
     <div style="padding:32px;">
       <h1 style="font-size:20px;color:#111111;margin:0 0 16px;">{heading}</h1>
@@ -29,9 +29,12 @@ def _brand_email_html(heading: str, message: str, cta_label: str, cta_url: str) 
 """.strip()
 
 
-def send_email(to_email: str, subject: str, heading: str, message: str,
+def send_email(to_email, subject: str, heading: str, message: str,
                 cta_label: str, cta_url: str) -> None:
     """Send a branded transactional email via Resend's HTTP API.
+
+    to_email: a single address, or a list of them (e.g. sending one
+    discovery-call summary to several team members at once).
 
     Uses urllib (stdlib) instead of `requests` — this is the only outbound
     HTTP call the backend makes, so it isn't worth a new dependency.
@@ -43,9 +46,11 @@ def send_email(to_email: str, subject: str, heading: str, message: str,
             "Email isn't configured yet — set RESEND_API_KEY."
         )
 
+    recipients = to_email if isinstance(to_email, list) else [to_email]
+
     body = json.dumps({
         "from": current_app.config.get("MAIL_FROM"),
-        "to": [to_email],
+        "to": recipients,
         "subject": subject,
         "html": _brand_email_html(heading, message, cta_label, cta_url),
     }).encode("utf-8")
@@ -57,6 +62,13 @@ def send_email(to_email: str, subject: str, heading: str, message: str,
         headers={
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
+            "Accept": "application/json",
+            # Cloudflare (which fronts Resend's API) blocks Python urllib's
+            # default User-Agent as bot-like — HTTP 403, plain-text body
+            # "error code: 1010". A normal-looking one is all it takes to
+            # get through; confirmed by reproducing the exact failure and
+            # the exact fix directly against the real API.
+            "User-Agent": "Tafsiri-Backend/1.0",
         },
     )
 

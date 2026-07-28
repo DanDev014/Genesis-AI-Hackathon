@@ -131,7 +131,8 @@ class FathomWebhookPayload(BaseModel):
 
 
 def _capture_payload(payload: dict, meeting_type: Optional[str] = None,
-                      deliver: str = "local") -> dict:
+                      deliver: str = "local",
+                      extra_action_items: Optional[list] = None) -> dict:
     """meeting_type is optional — when the caller doesn't have a human
     around to set it (an automated webhook), it falls through to the same
     auto-classify capture.py already does for a raw transcript
@@ -169,7 +170,7 @@ def _capture_payload(payload: dict, meeting_type: Optional[str] = None,
         # as the fallback over blind classification when there's no
         # explicit caller-supplied meeting_type either.
         meeting_type_hint=resolved_hint or parts["meeting_type_hint"],
-        extra_action_items=parts.get("action_items", []),
+        extra_action_items=parts.get("action_items", []) + (extra_action_items or []),
         meeting_occurred_at=parts.get("meeting_occurred_at", ""),
     )
     # save_capture() resolves the final "discovery_call" | "internal" value
@@ -324,10 +325,23 @@ async def fathom_webhook_native(
     webhook_timestamp: str = Header(default="", alias="webhook-timestamp"),
     webhook_signature: str = Header(default="", alias="webhook-signature"),
 ):
-    """Fathom's real, automated webhook. HMAC-verified (see above);
-    meeting_type is optional and falls through to _capture_payload's own
-    auto-classify fallback when Fathom doesn't send one — no human is
-    present to pick discovery vs. internal for an automated POST.
+    """Fathom's real, automated webhook. HMAC-verified (see above).
+    Payload shape confirmed against a real captured Fathom delivery
+    (transcript is a list of {speaker, text, timestamp} turns, not a flat
+    string — handled by capture.raw_transcript_text() /
+    _flatten_fathom_transcript()).
+
+    meeting_type resolution order: an explicit query param (never sent by
+    Fathom itself, but usable for manual testing) -> Fathom's own
+    calendar_invitees[].is_external signal
+    (capture.classify_from_calendar_invitees) -> _capture_payload's
+    text-based auto-classify fallback, for payloads with no calendar
+    metadata at all.
+
+    Fathom's own structured action_items (assignee/description/playback
+    link) are pulled in directly via capture.fathom_action_items() rather
+    than relying only on regex-scanning the transcript text for inline
+    markers, which Fathom's native format doesn't use.
 
     This is the only endpoint that delivers via flask_bridge (deliver=
     "flask") — a discovery call creates a real Summary, an internal
@@ -337,12 +351,12 @@ async def fathom_webhook_native(
     shortcuts (placeholder email/industry when a transcript doesn't state
     them) and the required FLASK_API_URL / GENESIS_SYSTEM_USER_ID env vars.
 
-    STILL A PLACEHOLDER for one thing: the exact JSON key Fathom uses for
-    the transcript hasn't been confirmed against a real payload yet (a live
-    webhook -> webhook.site capture is the fast way to close that gap).
-    capture.raw_transcript_text()'s lookup list may need one more key added
-    once that's known — everything else here already works against
-    whatever shape arrives.
+    Signature verification is implemented against the documented Svix
+    scheme and confirmed structurally correct against a real captured
+    request (header names, whsec_ format, v1,<base64> signature shape all
+    match) — not yet confirmed byte-for-byte against a real secret, since
+    that requires the actual whsec_... value from whoever registered the
+    webhook.
     """
     body = await request.body()
     if not _verify_fathom_signature(body, webhook_id, webhook_timestamp, webhook_signature):
@@ -363,7 +377,14 @@ async def fathom_webhook_native(
             return {"ok": False, "reason": "No transcript text found in the payload."}
         payload = capture.extract_structured_via_llm(raw_text) or {"transcript": raw_text}
 
-    return _capture_payload(payload, meeting_type, deliver="flask")
+    # Fathom's own explicit external/internal signal beats guessing from
+    # the transcript when neither a human nor the LLM extraction gave us
+    # one — see capture.classify_from_calendar_invitees().
+    resolved_meeting_type = meeting_type or capture.classify_from_calendar_invitees(parsed)
+    extra_action_items = capture.fathom_action_items(parsed)
+
+    return _capture_payload(payload, resolved_meeting_type, deliver="flask",
+                             extra_action_items=extra_action_items)
 
 
 # --------------------------- branded document rendering ---------------------------
@@ -381,12 +402,32 @@ async def render_proposal_html(request: Request):
     return HTMLResponse(html, headers={"X-Doc-Id": saved["id"]})
 
 
+@app.post("/render/proposal-preview.html", response_class=HTMLResponse)
+async def render_proposal_preview_html(request: Request):
+    """Same branded template as /render/proposal.html, but stateless — no
+    store.save_proposal() call, so it never writes a row anywhere. Used by
+    the frontend's "Download PDF" button, which needs fresh branded HTML
+    for a proposal that already exists in Flask; going through the save-
+    then-render endpoint would create a duplicate/orphan proposal row on
+    every single download (see CHANGES.md's "Important discovery")."""
+    data = await request.json()
+    return HTMLResponse(renderer.render_proposal_html(data))
+
+
 @app.post("/render/quote.html", response_class=HTMLResponse)
 async def render_quote_html(request: Request):
     data = await request.json()
     saved = store.save_quote(data)
     html = renderer.render_quote_html(saved)
     return HTMLResponse(html, headers={"X-Doc-Id": saved["id"]})
+
+
+@app.post("/render/quote-preview.html", response_class=HTMLResponse)
+async def render_quote_preview_html(request: Request):
+    """Stateless counterpart to /render/quote.html — see
+    render_proposal_preview_html's docstring above."""
+    data = await request.json()
+    return HTMLResponse(renderer.render_quote_html(data))
 
 
 @app.post("/render/proposal.pdf")
@@ -682,6 +723,18 @@ def _proposal_data_from_key_points(title: str, key_points: dict) -> dict:
     timeline = key_points.get("timeline")
     if isinstance(timeline, dict):
         timeline = "; ".join(f"{k.replace('_', ' ')}: {v}" for k, v in timeline.items())
+    elif isinstance(timeline, list):
+        # The extraction prompt asks for a flat {"<label>":"<value>"} dict,
+        # but the LLM doesn't always follow that exactly — sometimes it
+        # wraps things in a list instead (e.g. [{"label": "..."}]). Flatten
+        # defensively rather than let a raw JSON blob reach the UI.
+        parts = []
+        for item in timeline:
+            if isinstance(item, dict):
+                parts.append("; ".join(f"{k.replace('_', ' ')}: {v}" for k, v in item.items()))
+            elif item:
+                parts.append(str(item))
+        timeline = "; ".join(parts)
 
     requirements = [str(r) for r in (key_points.get("requirements") or []) if r]
 

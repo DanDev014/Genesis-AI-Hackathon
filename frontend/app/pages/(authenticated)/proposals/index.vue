@@ -6,7 +6,7 @@
           Proposals
         </h1>
       </div>
-      <UButton to="/kora-ai" icon="i-lucide-sparkles" class="text-white">
+      <UButton to="/tafsiri" icon="i-lucide-sparkles" class="text-white">
         Generate proposal
       </UButton>
     </div>

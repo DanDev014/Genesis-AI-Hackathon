@@ -187,12 +187,95 @@ def is_pre_digested(payload: dict) -> bool:
     return _is_structured_payload(payload)
 
 
+def _flatten_fathom_transcript(turns: list) -> str:
+    """Fathom's real native webhook sends `transcript` as a list of
+    {speaker: {display_name, matched_calendar_invitee_email}, text,
+    timestamp} turns — confirmed against a real captured payload — not a
+    single text blob like a pasted script. Flattened into the same
+    "HH:MM:SS - Name (domain)" header-line-then-text shape a pasted Fathom
+    transcript already uses, so SPEAKER_LINE_RE, the LLM extraction prompt,
+    and coverage analysis all keep working unchanged on either shape."""
+    lines = []
+    for turn in turns:
+        if not isinstance(turn, dict):
+            continue
+        speaker = turn.get("speaker") or {}
+        name = speaker.get("display_name") or "Unknown"
+        email = speaker.get("matched_calendar_invitee_email") or ""
+        domain = email.split("@", 1)[1] if "@" in email else ""
+        timestamp = turn.get("timestamp") or "0:00"
+        header = f"{timestamp} - {name}" + (f" ({domain})" if domain else "")
+        lines.append(header)
+        text = (turn.get("text") or "").strip()
+        if text:
+            lines.append(text)
+    return "\n".join(lines)
+
+
 def raw_transcript_text(payload: dict) -> str:
     """Pull just the transcript text out of a JSON payload, ignoring any
     summary/ai_summary/notes fields a source (e.g. Fathom's own webhook)
     may have included alongside it. We only ever extract from the actual
-    transcript, never a third party's own AI-generated summary."""
+    transcript, never a third party's own AI-generated summary.
+
+    Handles Fathom's real structured transcript shape (a list of turns,
+    flattened via _flatten_fathom_transcript) as well as a plain string —
+    checked at the top level and one level under the wrappers _walk_for
+    already knows about, since a list value would otherwise be silently
+    skipped by _walk_for (it only ever returns strings)."""
+    raw = payload.get("transcript") if isinstance(payload, dict) else None
+    if isinstance(raw, list):
+        return _flatten_fathom_transcript(raw)
+    if isinstance(payload, dict):
+        for wrap in ("data", "meeting", "event", "payload"):
+            inner = payload.get(wrap)
+            if isinstance(inner, dict) and isinstance(inner.get("transcript"), list):
+                return _flatten_fathom_transcript(inner["transcript"])
     return _walk_for(payload, ["transcript"])
+
+
+def classify_from_calendar_invitees(payload: dict) -> str:
+    """Fathom's own explicit external/internal signal
+    (calendar_invitees[].is_external) — confirmed present in a real
+    payload. More reliable than guessing from transcript speaker-line
+    domain annotations, which Fathom's native JSON transcript doesn't even
+    carry inline (unlike a pasted plain-text transcript). Returns
+    "discovery_meeting" / "internal", or "" if the payload has no such
+    signal — callers fall through to the text-based classifier in that
+    case."""
+    if not isinstance(payload, dict):
+        return ""
+    invitees = payload.get("calendar_invitees")
+    if not isinstance(invitees, list) or not invitees:
+        return ""
+    has_external = any(
+        isinstance(inv, dict) and inv.get("is_external") for inv in invitees
+    )
+    return "discovery_meeting" if has_external else "internal"
+
+
+def fathom_action_items(payload: dict) -> list:
+    """Fathom's own structured action_items (assignee/description/
+    playback link) — confirmed present in a real payload, and richer than
+    the inline 'ACTION ITEM: ... - WATCH: link' text markers
+    extract_action_items() looks for, which don't appear in Fathom's
+    native JSON transcript format at all."""
+    if not isinstance(payload, dict):
+        return []
+    items = []
+    for item in payload.get("action_items") or []:
+        if not isinstance(item, dict):
+            continue
+        text = (item.get("description") or "").strip()
+        if not text:
+            continue
+        assignee = item.get("assignee") or {}
+        items.append({
+            "text": text,
+            "link": item.get("recording_playback_url", "") or "",
+            "owner": assignee.get("name", "") or "",
+        })
+    return items
 
 
 # Containers a structured payload is commonly found wrapped inside — our own

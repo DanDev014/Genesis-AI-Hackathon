@@ -1,13 +1,13 @@
 <template>
   <main class="mx-auto h-screen p-6">
     <div>
-      <p class="text-sm font-medium text-primary">Kora AI workspace</p>
+      <p class="text-sm font-medium text-primary">Tafsiri workspace</p>
       <h1 class="mt-1 text-xl font-semibold tracking-tight text-neutral-950">
         Turn a Fathom transcript into a summary, proposal and quotations.
       </h1>
       <p class="m-2 text-neutral-500 text-sm">
         Paste a meeting transcript, choose its place in the sales journey, and
-        Kora will prepare the right artifact.
+        Tafsiri will prepare the right artifact.
       </p>
     </div>
     <div class="grid gap-6 lg:grid-cols-5">

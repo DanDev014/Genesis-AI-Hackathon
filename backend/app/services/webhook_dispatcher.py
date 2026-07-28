@@ -31,7 +31,7 @@ def dispatch_event(event: str, data: dict) -> None:
     secret = current_app.config.get("OUTBOUND_WEBHOOK_SECRET")
     if secret:
         signature = hmac.new(secret.encode("utf-8"), body, hashlib.sha256).hexdigest()
-        headers["X-Kora-Signature"] = f"sha256={signature}"
+        headers["X-Tafsiri-Signature"] = f"sha256={signature}"
 
     request = urllib.request.Request(url, data=body, method="POST", headers=headers)
     try:

@@ -7,7 +7,7 @@ useHead({
   },
 });
 
-const title = "Kora AI";
+const title = "Tafsiri";
 const description = "Genesis AI";
 
 useSeoMeta({

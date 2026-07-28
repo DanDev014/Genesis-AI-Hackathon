@@ -150,7 +150,7 @@ class Quote(db.Model):
                 else None
             ),
 
-            # Aliases for the Kora-agent quote shape (renderer.py's
+            # Aliases for the Tafsiri-agent quote shape (renderer.py's
             # _defaults_for_quote) so the frontend doesn't need two
             # different field names depending on which backend served the
             # quote. Not a new column — subtotal is summed from line_items

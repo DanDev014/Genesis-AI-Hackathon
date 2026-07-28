@@ -9,6 +9,7 @@ from app.exceptions import (
     ValidationError,
 )
 from app.models.summary import Summary
+from app.services.email_service import send_email
 
 
 class SummaryService:
@@ -182,3 +183,58 @@ class SummaryService:
             raise DatabaseError(
                 "Unable to update summary."
             )
+
+    @staticmethod
+    def send_summary(summary_id, data):
+        """
+        POST /api/summaries/<id>/send
+
+        Body: { to_emails: string[], subject?: str, message?: str }
+
+        Internal, team-facing — unlike proposal sending, this doesn't
+        generate a public share token. Recipients are expected to already
+        have an account, so the CTA just links to the normal (login-gated)
+        summary page.
+        """
+        from flask import current_app
+
+        if not data or not data.get("to_emails"):
+            raise ValidationError("At least one recipient email is required")
+
+        to_emails = [e.strip() for e in data["to_emails"] if e and e.strip()]
+        if not to_emails:
+            raise ValidationError("At least one recipient email is required")
+
+        summary = Summary.query.filter_by(summary_id=summary_id).first()
+
+        if summary is None:
+            raise ResourceNotFound("Summary not found")
+
+        meeting = summary.first_meeting_deliverables or {}
+        key_points = meeting.get("key_points", meeting) if isinstance(meeting, dict) else {}
+        client_info = (key_points or {}).get("client") or {}
+        company = client_info.get("company") or (summary.client.company if summary.client else "a client")
+        meeting_title = meeting.get("title") if isinstance(meeting, dict) else None
+
+        subject = (data.get("subject") or "").strip() or f"Discovery call summary — {company}"
+        message = (data.get("message") or "").strip() or (
+            f"The discovery call with {company} has been processed. "
+            "Click below to see the full summary, key points, and open questions."
+        )
+
+        summary_url = f"{current_app.config.get('PUBLIC_APP_URL')}/summaries/{summary.summary_id}"
+
+        send_email(
+            to_email=to_emails,
+            subject=subject,
+            heading=meeting_title or "Discovery call summary",
+            message=message,
+            cta_label="View summary",
+            cta_url=summary_url,
+        )
+
+        return {
+            "success": True,
+            "message": f"Summary sent to {len(to_emails)} recipient(s).",
+            "data": summary.to_dict(),
+        }

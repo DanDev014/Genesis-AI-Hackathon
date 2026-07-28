@@ -146,7 +146,7 @@ watch(
   (proposal) => {
     const company = proposal?.client?.company || "your project";
     form.to_email = proposal?.client?.email || "";
-    form.subject = `Your proposal from Kora AI — ${company}`;
+    form.subject = `Your proposal from Tafsiri — ${company}`;
     form.message =
       "Please find your proposal ready for review. Click below to view the full scope, timeline, and pricing.";
   },
