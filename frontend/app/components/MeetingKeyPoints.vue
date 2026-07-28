@@ -2,7 +2,7 @@
   <div v-if="meeting" class="space-y-6">
     <!-- Meeting -->
     <div>
-      <h3 class="text-lg font-semibold">
+      <h3 class="text-lg font-semibold text-neutral-950">
         {{ meeting.title }}
       </h3>
 
@@ -13,26 +13,26 @@
 
     <!-- Client -->
     <div v-if="meeting.key_points?.client">
-      <h4 class="mb-2 font-medium">Client</h4>
+      <h4 class="mb-2 font-medium text-neutral-950">Client</h4>
 
-      <p>
+      <p class="text-neutral-700">
         {{ meeting.key_points.client.company || "—" }}
       </p>
 
-      <p class="text-sm text-muted">
+      <p class="text-sm text-neutral-500">
         {{ meeting.key_points.client.primary_contact || "" }}
       </p>
     </div>
 
     <!-- Project -->
     <div v-if="meeting.key_points?.project">
-      <h4 class="mb-2 font-medium">Project</h4>
+      <h4 class="mb-2 font-medium text-neutral-950">Project</h4>
 
-      <p class="font-medium">
+      <p class="font-medium text-neutral-900">
         {{ meeting.key_points.project.name || "—" }}
       </p>
 
-      <p class="text-sm text-muted">
+      <p class="text-sm text-neutral-600">
         {{ meeting.key_points.project.objective || "" }}
       </p>
 
@@ -48,14 +48,14 @@
 
     <!-- Target Audience -->
     <div v-if="meeting.key_points?.target_audience?.length">
-      <h4 class="mb-2 font-medium">Target Audience</h4>
+      <h4 class="mb-2 font-medium text-neutral-950">Target Audience</h4>
 
-      <ul class="list-disc space-y-1 pl-5">
+      <ul class="list-disc space-y-1 pl-5 text-neutral-700">
         <li
           v-for="audience in meeting.key_points.target_audience"
           :key="audience.segment"
         >
-          <strong>{{ audience.segment }}</strong>
+          <strong class="text-neutral-900">{{ audience.segment }}</strong>
           —
           {{ audience.goal }}
         </li>
@@ -64,13 +64,13 @@
 
     <!-- Deliverables -->
     <div v-if="meeting.key_points?.deliverables?.length">
-      <h4 class="mb-2 font-medium">Deliverables</h4>
+      <h4 class="mb-2 font-medium text-neutral-950">Deliverables</h4>
 
-      <ul class="list-disc space-y-1 pl-5">
+      <ul class="list-disc space-y-1 pl-5 text-neutral-700">
         <li v-for="item in meeting.key_points.deliverables" :key="item.name">
           {{ item.name }}
 
-          <span v-if="item.duration"> ({{ item.duration }}) </span>
+          <span v-if="item.duration" class="text-neutral-500"> ({{ item.duration }}) </span>
 
           <UBadge
             v-if="item.status"
@@ -87,13 +87,13 @@
 
     <!-- Creative Direction -->
     <div v-if="meeting.key_points?.creative_direction">
-      <h4 class="mb-2 font-medium">Creative Direction</h4>
+      <h4 class="mb-2 font-medium text-neutral-950">Creative Direction</h4>
 
-      <p v-if="meeting.key_points.creative_direction.description" class="mb-2 text-sm">
+      <p v-if="meeting.key_points.creative_direction.description" class="mb-2 text-sm text-neutral-700">
         {{ meeting.key_points.creative_direction.description }}
       </p>
 
-      <ul class="list-disc space-y-1 pl-5">
+      <ul class="list-disc space-y-1 pl-5 text-neutral-700">
         <li
           v-for="theme in meeting.key_points.creative_direction.messaging_themes ?? []"
           :key="theme"
@@ -105,21 +105,21 @@
 
     <!-- Timeline -->
     <div v-if="meeting.key_points?.timeline">
-      <h4 class="mb-2 font-medium">Timeline</h4>
+      <h4 class="mb-2 font-medium text-neutral-950">Timeline</h4>
 
-      <ul class="space-y-1 text-sm">
+      <ul class="space-y-1 text-sm text-neutral-700">
         <li v-if="meeting.key_points.timeline.hackathon_end">
-          <strong>Hackathon Ends:</strong>
+          <strong class="text-neutral-900">Hackathon Ends:</strong>
           {{ meeting.key_points.timeline.hackathon_end }}
         </li>
 
         <li v-if="meeting.key_points.timeline.summary_video_genesis_quote">
-          <strong>Summary Video:</strong>
+          <strong class="text-neutral-900">Summary Video:</strong>
           {{ meeting.key_points.timeline.summary_video_genesis_quote }}
         </li>
 
         <li v-if="meeting.key_points.timeline.social_clips_genesis_quote">
-          <strong>Social Clips:</strong>
+          <strong class="text-neutral-900">Social Clips:</strong>
           {{ meeting.key_points.timeline.social_clips_genesis_quote }}
         </li>
       </ul>
@@ -127,23 +127,23 @@
 
     <!-- Budget -->
     <div v-if="meeting.key_points?.budget">
-      <h4 class="mb-2 font-medium">Budget</h4>
+      <h4 class="mb-2 font-medium text-neutral-950">Budget</h4>
 
-      <p>
+      <p class="text-neutral-700">
         {{ meeting.key_points.budget.status || "Not yet established." }}
       </p>
     </div>
 
     <!-- Competition -->
     <div v-if="meeting.key_points?.competition">
-      <h4 class="mb-2 font-medium">Competition</h4>
+      <h4 class="mb-2 font-medium text-neutral-950">Competition</h4>
 
-      <p v-if="meeting.key_points.competition.other_agencies">
+      <p v-if="meeting.key_points.competition.other_agencies" class="text-neutral-700">
         Other agencies:
         {{ meeting.key_points.competition.other_agencies }}
       </p>
 
-      <p v-if="meeting.key_points.competition.selection_method">
+      <p v-if="meeting.key_points.competition.selection_method" class="text-neutral-700">
         Selection:
         {{ meeting.key_points.competition.selection_method }}
       </p>
@@ -151,13 +151,13 @@
 
     <!-- Next Steps -->
     <div v-if="meeting.key_points?.next_steps">
-      <h4 class="mb-2 font-medium">Next Steps</h4>
+      <h4 class="mb-2 font-medium text-neutral-950">Next Steps</h4>
 
       <div class="grid gap-4 md:grid-cols-2">
         <div v-if="meeting.key_points.next_steps.genesis?.length">
-          <h5 class="mb-2 font-medium">Genesis</h5>
+          <h5 class="mb-2 font-medium text-neutral-900">Genesis</h5>
 
-          <ul class="list-disc space-y-1 pl-5">
+          <ul class="list-disc space-y-1 pl-5 text-neutral-700">
             <li v-for="step in meeting.key_points.next_steps.genesis" :key="step">
               {{ step }}
             </li>
@@ -165,9 +165,9 @@
         </div>
 
         <div v-if="meeting.key_points.next_steps.client?.length">
-          <h5 class="mb-2 font-medium">Client</h5>
+          <h5 class="mb-2 font-medium text-neutral-900">Client</h5>
 
-          <ul class="list-disc space-y-1 pl-5">
+          <ul class="list-disc space-y-1 pl-5 text-neutral-700">
             <li v-for="step in meeting.key_points.next_steps.client" :key="step">
               {{ step }}
             </li>
@@ -191,15 +191,15 @@
       class="space-y-4"
     >
       <div v-if="meeting.key_points?.participants?.length">
-        <h4 class="mb-2 font-medium">Participants</h4>
-        <p class="text-sm text-muted">
+        <h4 class="mb-2 font-medium text-neutral-950">Participants</h4>
+        <p class="text-sm text-neutral-600">
           {{ meeting.key_points.participants.join(", ") }}
         </p>
       </div>
 
       <div v-if="meeting.key_points?.action_items?.length">
-        <h4 class="mb-2 font-medium">Action Items</h4>
-        <ul class="list-disc space-y-1 pl-5">
+        <h4 class="mb-2 font-medium text-neutral-950">Action Items</h4>
+        <ul class="list-disc space-y-1 pl-5 text-neutral-700">
           <li v-for="item in meeting.key_points.action_items" :key="item">
             {{ item }}
           </li>
@@ -211,14 +211,14 @@
           !meeting.key_points?.participants?.length &&
           !meeting.key_points?.action_items?.length
         "
-        class="text-sm text-muted"
+        class="text-sm text-neutral-500"
       >
         No structured details were extracted from this transcript.
       </p>
     </div>
   </div>
 
-  <div v-else class="py-8 text-center text-sm text-muted">
+  <div v-else class="py-8 text-center text-sm text-neutral-500">
     No summary data available.
   </div>
 </template>

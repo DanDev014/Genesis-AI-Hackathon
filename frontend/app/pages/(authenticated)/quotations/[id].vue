@@ -40,8 +40,11 @@
           <UTooltip :text="quote.proposal?.approved ? '' : 'Approve the linked proposal first'">
             <UButton
               icon="i-lucide-banknote"
-              color="neutral"
-              :class="quote.proposal?.approved ? 'text-white' : ''"
+              :class="
+                quote.proposal?.approved
+                  ? 'bg-neutral-900 text-white hover:bg-neutral-800'
+                  : 'bg-neutral-200 text-neutral-500'
+              "
               :disabled="!quote.proposal?.approved"
               :loading="sendingToQb"
               @click="sendToQuickBooks"

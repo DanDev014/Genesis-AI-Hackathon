@@ -94,7 +94,7 @@
 import * as v from "valibot";
 
 // Nuxt UI's default field background renders dark in this app's theme —
-// every field needs this override, same as kora-ai.vue's inputs.
+// every field needs this override, same as tafsiri.vue's inputs.
 const FIELD_BASE =
   "bg-white text-neutral-900 ring-neutral-200 focus:ring-2 focus:ring-[#e0b818]";
 

@@ -124,10 +124,17 @@ def call_text(system: str, user: str, tier: str = "fast",
         est_input = max(1, (len(system) + len(user)) // 4)
         max_tokens = max(200, min(1200, int(est_input * 0.4)))
 
-    import google.generativeai as genai  # imported lazily so mock mode is dep-free
-    genai.configure(api_key=API_KEY)
     model_name = _model_for(tier)
     try:
+        # Imported lazily (so mock mode is dep-free) *inside* the try —
+        # a broken/missing google-generativeai install (or grpc, its own
+        # dependency) must degrade to the same "no LLM available" fallback
+        # as any other call failure, not crash the caller. This is the
+        # only thing standing between a bad local Python env and every
+        # webhook request 500ing instead of falling back to the raw
+        # transcript.
+        import google.generativeai as genai
+        genai.configure(api_key=API_KEY)
         model = genai.GenerativeModel(
             model_name=model_name,
             system_instruction=system,

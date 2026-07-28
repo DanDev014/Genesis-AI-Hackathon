@@ -8,7 +8,7 @@
       <UDashboardSidebarHeader>
         <NuxtLink to="/dashboard" class="flex items-center gap-3 px-1 py-2">
           <AppLogoMark class="size-8 shrink-0" />
-          <span class="text-sm font-semibold tracking-tight text-white">Kora AI</span>
+          <span class="text-sm font-semibold tracking-tight text-white">Tafsiri</span>
         </NuxtLink>
       </UDashboardSidebarHeader>
 
@@ -79,9 +79,9 @@ const links = [
     to: "/dashboard",
   },
   {
-    label: "Kora AI",
+    label: "Tafsiri",
     icon: "i-lucide-sparkles",
-    to: "/kora-ai",
+    to: "/tafsiri",
   },
   {
     label: "Clients",

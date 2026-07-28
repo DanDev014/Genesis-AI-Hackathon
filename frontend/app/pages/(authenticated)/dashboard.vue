@@ -6,7 +6,7 @@
           Good morning, Genesis team.
         </h1>
       </div>
-      <UButton to="/kora-ai" icon="i-lucide-sparkles" class="text-white">
+      <UButton to="/tafsiri" icon="i-lucide-sparkles" class="text-white">
         Process a meeting
       </UButton>
     </section>
@@ -29,7 +29,7 @@
       <MetricCard
         label="Meetings processed"
         :value="String(metrics?.meetings_processed ?? 0)"
-        detail="Captured via Kora AI"
+        detail="Captured via Tafsiri"
         icon="i-lucide-audio-lines"
       />
       <MetricCard
@@ -93,7 +93,7 @@
               <UIcon name="i-lucide-sparkles" />
             </span>
             <div>
-              <h2 class="font-semibold">Kora AI</h2>
+              <h2 class="font-semibold">Tafsiri</h2>
               <p class="text-xs text-neutral-400">Meeting intelligence</p>
             </div>
           </div>
@@ -103,7 +103,7 @@
             Drop in a Fathom transcript to produce a discovery summary or a proposal-ready
             strategy pack.
           </p>
-          <UButton to="/kora-ai" block class="text-white">
+          <UButton to="/tafsiri" block class="text-white">
             Open AI workspace
           </UButton>
         </div>

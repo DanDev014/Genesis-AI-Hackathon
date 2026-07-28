@@ -36,7 +36,7 @@
         </div>
         <div class="flex gap-3">
           <UBadge color="warning" variant="subtle">{{ client.status || "Unknown" }}</UBadge>
-          <UButton to="/kora-ai" class="text-white">
+          <UButton to="/tafsiri" class="text-white">
             Process meeting
           </UButton>
         </div>

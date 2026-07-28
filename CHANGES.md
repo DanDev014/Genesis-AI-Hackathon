@@ -156,18 +156,48 @@ automatically:
 **Files**: `genesis_agent/agent/main.py` (`_verify_fathom_signature`,
 `fathom_webhook_native`, `_capture_payload` refactor), `genesis_agent/.env.example`.
 
-**Still blocked on two things — genuinely, not an oversight:**
-1. **The exact JSON field Fathom uses for the transcript** hasn't been
-   confirmed against a real payload. `capture.raw_transcript_text()`'s lookup
-   list may need one more key once you see one.
-2. **The signature scheme hasn't been tested against a real Fathom-signed
-   request** — correct per the documented convention, unconfirmed against
-   actual output.
+**Update — both blockers closed against a real captured payload.** You
+registered a webhook.site test webhook, recorded a real meeting, and shared
+the actual payload + headers Fathom sent. That confirmed:
 
-**In progress as of this writing**: you registered a webhook.site test URL in
-Fathom and had at least one real meeting recorded since. The concrete next
-step is retrieving that captured payload and sharing it so both gaps above can
-be closed in one pass.
+1. **Headers/signature format**: `webhook-id`, `webhook-timestamp`,
+   `webhook-signature` (format `v1,<base64>`), sent by `Svix-Webhooks` (the
+   user-agent literally says so) — exactly what `_verify_fathom_signature`
+   already implemented. Structurally confirmed correct; still not verified
+   byte-for-byte against a real secret (that requires the actual `whsec_...`
+   from your registered webhook, which wasn't shared).
+2. **Transcript field**: real, but **not a string** — `transcript` is a list
+   of `{speaker: {display_name, matched_calendar_invitee_email}, text,
+   timestamp}` turns. `raw_transcript_text()` only handled strings before
+   this, so it would have silently returned nothing for real Fathom traffic.
+   Fixed: `_flatten_fathom_transcript()` converts it into the same
+   `"HH:MM:SS - Name (domain)"` / text-on-next-line shape a pasted
+   transcript already used, so every existing text-based extraction path
+   keeps working unchanged.
+
+**Two more improvements fell out of seeing the real payload**, beyond what
+was originally scoped:
+- `classify_from_calendar_invitees()` — Fathom sends its own explicit
+  `calendar_invitees[].is_external` flag, more reliable than guessing from
+  transcript speaker-line domain annotations (which Fathom's native JSON
+  format doesn't even carry inline, unlike a pasted plain-text transcript).
+  Now checked first in `fathom_webhook_native`, before falling back to the
+  text-based classifier.
+- `fathom_action_items()` — Fathom sends its own structured action items
+  (assignee, description, playback link timestamped to the recording),
+  richer than the inline `"ACTION ITEM: ... - WATCH: link"` text markers
+  the regex fallback looks for. Pulled in directly and merged with whatever
+  the extraction step finds.
+
+All three (transcript flattening, calendar-based classification, structured
+action items) verified end-to-end against your actual payload — see the
+conversation for the test output.
+
+**Still open**: the signature check is unverified against a real secret
+(structurally correct, not cryptographically confirmed), and this endpoint
+still isn't receiving real production traffic — that's Phase 3 onward of
+the setup walkthrough (public URL, real webhook registration in Fathom,
+env vars), not a code gap.
 
 ---
 
@@ -320,6 +350,180 @@ untouched and still has the duplicate-write issue.
 **Reminder**: this only activates in production once #7's remaining blockers
 clear — registering the real webhook with Fathom and confirming the
 transcript field. Built and tested; nothing calls it for real traffic yet.
+
+---
+
+## 12. Fathom transcript field fixes (confirmed against a real payload)
+
+**What**: while testing #7 against a real recorded meeting, three concrete
+mismatches between our assumptions and Fathom's actual payload shape came
+up, all fixed in `capture.py`:
+- `transcript` is a **list** of `{speaker, text, timestamp}` turns, not a
+  flat string — `raw_transcript_text()` only handled strings before, so it
+  silently returned nothing for real Fathom payloads. Now flattens the list
+  into the same speaker-line text format a pasted transcript already used.
+- `classify_from_calendar_invitees()` — Fathom sends its own explicit
+  `calendar_invitees[].is_external` flag, more reliable than guessing from
+  transcript text (which doesn't carry domain annotations in Fathom's native
+  format at all).
+- `fathom_action_items()` — Fathom sends structured action items
+  (assignee/description/playback link) separately from the transcript;
+  pulled in directly instead of only regex-scanning for inline markers.
+
+Also fixed: `_proposal_data_from_key_points()`'s timeline flattening only
+handled a `{"label": "value"}` dict — the LLM extraction doesn't always
+follow that shape exactly (observed it wrapping timeline info in a list
+instead), which was leaking raw JSON into the Timeline card on the proposal
+page. Now flattens list shapes too. **Only fixes it going forward** —
+proposals already generated with the bad shape still have the raw JSON
+stored; needs a manual edit or regeneration to fix retroactively.
+
+---
+
+## 13. Rebrand: Kora AI → Tafsiri
+
+**What**: every user-facing occurrence of "Kora AI" renamed to "Tafsiri" —
+page titles, nav/sidebar, email subjects and branded email template, PDF
+footers, the `/kora-ai` route (file renamed to `tafsiri.vue`, all links
+updated), and the outbound webhook's signature header
+(`X-Kora-Signature` → `X-Tafsiri-Signature`). Internal code comments in
+`genesis_agent` that just refer to "Kora" as the codebase's own name
+(docstrings in `db.py`, `llm_client.py`, `quickbooks.py`, its `README.md`)
+were deliberately left alone — no user or demo audience ever sees those.
+
+---
+
+## 14. Send discovery-call summaries to the team (email)
+
+**What**: summaries had no send capability at all before this — only
+list/get/create/update. New `POST /api/summaries/<id>/send` (`to_emails`
+array, sends one email to everyone at once via Resend). Unlike proposal
+sending, there's no public share token — the email's CTA links straight to
+the normal, login-gated `/summaries/<id>` page, since the audience (your
+team) already has accounts. UI: a "Send to team" button on both the
+post-generation preview modal and the summary detail page.
+
+**Files**: `services/email_service.py` (`send_email` now accepts a list of
+recipients, not just one), `services/summary_service.py`
+(`send_summary`), `routes/summaries.py`. Frontend:
+`server/api/summaries/[id]/send.post.ts`, new `SendSummaryModal.vue` (used
+by the summary detail page), and the send form inlined directly into
+`SummaryPreviewModal.vue` (see the caveat below on why).
+
+---
+
+## 15. Real branded PDF downloads (were "just bullet points")
+
+**What**: `downloadProposalPdf.ts` / `downloadQuotationPdf.ts` /
+`downloadSummaryPdf.ts` had a nicely designed branded Jinja template
+(`genesis_agent/templates/proposal|quote/default.html`) sitting mostly
+unused — it only rendered when a `proposal_html` field happened to be
+present, which is never persisted, so in practice every download except the
+one right after AI-generation fell back to a hand-drawn, line-by-line
+`pdf-lib` PDF (literally `"• " + item` text). Now both proposal and quote
+downloads always fetch the branded template fresh from genesis_agent (using
+the record's *current* data, not a stale snapshot) and capture that into
+the PDF, falling back to the old plain version only if genesis_agent is
+unreachable.
+
+**Files**: new stateless genesis_agent endpoints
+`POST /render/proposal-preview.html` / `POST /render/quote-preview.html`
+(same templates as the existing `/render/*.html` routes, but without their
+`store.save_*()` side effect — the existing ones would have created a
+duplicate/orphan record on every single download, compounding the
+duplicate-write issue described in "Important discovery" below). Frontend:
+`server/api/agent/render-proposal.post.ts`,
+`server/api/agent/render-quote.post.ts`, new `utils/brandedDocumentData.ts`
+(maps Flask's proposal/quote shape into what the Jinja template expects),
+new `utils/renderBrandedPdf.ts` (shared iframe + html2canvas capture logic).
+
+---
+
+## 16. UI contrast bugs — "neutral" buttons rendering nearly invisible
+
+**What turned out to be true, contrary to an assumption made partway through
+this session**: `color="neutral"` solid buttons in this app's actual Nuxt UI
+v4 theme render pale/washed-out — **not just when disabled**, confirmed via
+screenshots of fully-enabled buttons ("Record outcome," "Approve") looking
+just as washed out as the disabled QuickBooks button that first surfaced
+this. The earlier fix (conditionally forcing `text-white` only when
+enabled) was based on a wrong theory and didn't fully address it.
+
+**Actual fix**: stopped using `color="neutral"` for these buttons entirely
+and replaced it with explicit Tailwind classes (`bg-neutral-900 text-white
+hover:bg-neutral-800` enabled, `bg-neutral-200 text-neutral-500` disabled
+where relevant) — no longer dependent on however Nuxt UI's theme computes
+"neutral" internally. Fixed: the QuickBooks send button
+(`quotations/[id].vue`), "Record outcome" and "Approve"
+(`proposals/[id].vue`), and the two submit buttons that were disabled (and
+therefore invisible) by default on load in `CreateClientModal.vue` /
+`EditQuotationModal.vue` (`:disabled="!isValid"`, true until the form is
+filled in).
+
+**Also fixed**: `MeetingKeyPoints.vue` (the meeting-summary content shown in
+both the post-generation modal and the summary detail page) never set
+explicit text colors at all, inheriting a near-invisible light default
+instead of this app's normal dark, readable text classes.
+
+---
+
+## 17. Outbound email delivery — two real infrastructure bugs found and fixed
+
+Both found by reproducing the actual failing request directly against the
+real API rather than guessing from the app's generic error message.
+
+1. **Resend rejecting every send with `403 / error code: 1010`.** Not a
+   Resend application error — that's a **Cloudflare block page** (Cloudflare
+   fronts Resend's API), triggered because `email_service.py` used Python
+   `urllib`'s default User-Agent, which reads as bot-like. Fixed: added an
+   explicit `User-Agent` header. Confirmed by reproducing the exact failure,
+   then the exact fix, directly against the live API.
+2. **QuickBooks sandbox failing with a generic `400` on `/estimate`.** Real
+   cause, found the same way: the stored `QUICKBOOKS_REFRESH_TOKEN` is
+   invalid (`invalid_grant`) — Intuit rotates refresh tokens on use and
+   `_refresh_access_token()` never persists the new one (a shortcut already
+   flagged in #9), so it silently broke itself after the first real
+   exchange. Not fixed in code (needs a fresh interactive OAuth
+   re-authorization through Intuit's dashboard, which only you can do) —
+   `QUICKBOOKS_MODE` switched to `simulated` in `.env` so this doesn't keep
+   blocking you.
+
+**Files**: `services/email_service.py` only (the QuickBooks issue is a
+credential/`.env` problem, not a code change).
+
+---
+
+## Environment issues found, not code bugs — worth knowing about
+
+Three separate native-dependency failures surfaced in the `learn-new` conda
+environment during this session: `pydantic_core._pydantic_core` failing to
+import, `grpc`/`cygrpc` failing to import (blocked `google-generativeai`,
+silently — see the `llm_client.py` fix below), and
+`ssl.SSLError: [ASN1: NOT_ENOUGH_DATA]` breaking outbound HTTPS entirely.
+All three are consistent with a corrupted or mismatched OpenSSL/native
+build in that specific environment — **not** anything in this codebase.
+`trade_311` (also on this machine) made every real outbound HTTPS call
+during this session's debugging without issue (Resend, Intuit OAuth, Intuit
+sandbox). Recommend running the backend under `trade_311` instead of
+`learn-new` going forward.
+
+**One related code fix**: `genesis_agent/agent/llm_client.py`'s
+`import google.generativeai` sat *outside* the try/except meant to catch
+exactly this kind of failure — a broken/missing package crashed the whole
+request (including the native webhook) instead of gracefully falling back
+to "no LLM available," which is what the rest of the code already expects
+as a normal, handled case. Moved the import inside the try.
+
+**Also found while debugging "it's still broken after I restarted" (repeatedly)**:
+Flask's `--reload` debug mode spawns a parent (reloader) +
+child (worker) process pair, and closing a terminal window without a clean
+Ctrl+C (or starting a new terminal instead of reusing the old one) leaves
+the old pair running as orphans. Requests then land unpredictably across
+whichever stale process still holds the port, producing exactly the
+"I fixed it, but it's not fixed" symptom seen several times this session.
+Not a code issue — just worth knowing: always stop the *same* terminal
+(Ctrl+C, wait for the prompt) before restarting, rather than opening a new
+one.
 
 ---
 

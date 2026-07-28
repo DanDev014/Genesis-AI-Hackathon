@@ -6,7 +6,7 @@
           Quotations
         </h1>
       </div>
-      <UButton to="/kora-ai" icon="i-lucide-plus" class="text-white">
+      <UButton to="/tafsiri" icon="i-lucide-plus" class="text-white">
         New quotation
       </UButton>
     </div>

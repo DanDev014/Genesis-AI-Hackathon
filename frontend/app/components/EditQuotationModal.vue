@@ -109,7 +109,7 @@
                 Cancel
               </UButton>
 
-              <UButton type="submit" color="primary" class="text-white" :loading="saving" :disabled="!isValid">
+              <UButton type="submit" color="primary" :class="isValid ? 'text-white' : ''" :loading="saving" :disabled="!isValid">
                 Save changes
               </UButton>
             </div>
